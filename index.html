@@ -171,25 +171,27 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 
   // [名前, 遅れ値, ハネ値(%)]
   const PRESETS = [
-    ['ストレート', 0, 50],
-    ['3連スウィング', 0, 66.7],
-    ['付点（3:1）', 0, 75],
+    ['イーブン（ストレート）', 0, 50],
+    ['3連', 0, 66.7],
+    ['付点（ハネ強め）', 0, 75],
     ['軽めの跳ね', 0, 58],
-    ['レイドバック例', 0.1, 58],
-    ['前ノリ例', -0.04, 64],
+    ['後ろノリの例', 0.1, 58],
+    ['前ノリの例', -0.04, 64],
   ];
-  // 井上ほか（2017）表1 の中央値: [奏者 — 曲（録音年）, 遅れ値, ハネ値(%), 録音テンポ]
+  // 井上ほか（2017）表1 の中央値: [奏者, 曲, 録音年, 遅れ値, ハネ値(%), 録音テンポ]。Red Cross / Billie's Bounce は take1
   const PAPER = [
-    ["Hawkins — JATP Blues ('46)", 0, 66, 190],
-    ["Young — JATP Blues ('46)", 0.1, 60, 190],
-    ["Parker — JATP Blues ('46)", 0.19, 60, 190],
-    ["Rich（ハイハット）— JATP Blues ('46)", 0, 72, 190],
-    ["Hawkins — Fine Dinner ('39)", 0, 64, 173],
-    ["Young — Way Down Yonder In New Orleans ('38)", 0.1, 58, 192],
-    ["Parker — Red Cross take1 ('44)", 0.2, 59, 200],
-    ["Parker — Billie's Bounce take1 ('45)", 0.19, 60, 168],
-    ["Davis — Billie's Bounce take1 ('45)", 0.16, 59, 168],
+    ['チャーリー・パーカー', 'Red Cross', 1944, 0.2, 59, 200],
+    ['チャーリー・パーカー', "Billie's Bounce", 1945, 0.19, 60, 168],
+    ['チャーリー・パーカー', 'JATP Blues', 1946, 0.19, 60, 190],
+    ['マイルス・デイヴィス', "Billie's Bounce", 1945, 0.16, 59, 168],
+    ['レスター・ヤング', 'Way Down Yonder In New Orleans', 1938, 0.1, 58, 192],
+    ['レスター・ヤング', 'JATP Blues', 1946, 0.1, 60, 190],
+    ['コールマン・ホーキンス', 'Fine Dinner', 1939, 0, 64, 173],
+    ['コールマン・ホーキンス', 'JATP Blues', 1946, 0, 66, 190],
+    ['バディ・リッチ（ドラム）', 'JATP Blues', 1946, 0, 72, 190],
   ];
+  const tameTag = lag => lag <= -0.02 ? '前ノリ' : lag < 0.04 ? 'ジャスト' : lag < 0.14 ? 'ちょい後ろ' : 'かなり後ろ';
+  const haneTag = dist => dist < 54 ? 'まっすぐ' : dist < 62 ? '軽く跳ねる' : dist < 69 ? '3連くらい' : '強く跳ねる';
   const KEY = 'nori-lab-presets';
   const loadMine = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
   const saveMine = a => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
