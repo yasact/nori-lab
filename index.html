@@ -148,7 +148,7 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
       <input type="text" id="pname" placeholder="名前（例：自分のノリ）" aria-label="プリセット名">
       <button id="psave">今のノリを保存</button>
     </div>
-    <p class="note" style="margin-top:12px">プレイヤーの値は、録音を 1 音ずつ測った研究（井上裕章ほか, 音楽知覚認知研究 23(1), 2017）の中央値。押すと録音のテンポになる。バディ・リッチはドラム（ハイハット）の値。保存したノリはこのブラウザにだけ残る。</p>
+    <p class="note" style="margin-top:12px">プレイヤーの値は、録音を 1 音ずつ測った研究（井上裕章ほか, 音楽知覚認知研究 23(1), 2017）の中央値。押すと録音のテンポになる。バディ・リッチはドラム（ハイハット）の値。保存したノリはこのブラウザにだけ残る。スペースキーで再生／停止。</p>
   </section>
 </div>
 
@@ -435,7 +435,8 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   }
   $('play').addEventListener('click', () => playing ? stop() : start());
   document.addEventListener('keydown', e => {
-    if (e.code === 'Space' && !(e.target instanceof HTMLInputElement && e.target.type === 'number')) {
+    const t = e.target, skip = t instanceof HTMLSelectElement || t instanceof HTMLButtonElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type !== 'range');
+    if (e.code === 'Space' && !skip) {
       e.preventDefault(); playing ? stop() : start();
     }
   });
