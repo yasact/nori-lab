@@ -55,19 +55,14 @@ select{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(
 .chk label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .chk input{accent-color:var(--brass)}
 h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-weight:700}
-#presets h3{font-size:.75rem;letter-spacing:.08em;color:var(--mute);margin:16px 0 4px;font-weight:700}
-#presets h3:first-child{margin-top:0}
-.prow{display:flex;align-items:center;margin-top:6px}
-.pick{flex:1 1 auto;min-width:0;min-height:44px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;padding:6px 10px}
-.pick .info{min-width:0;overflow-wrap:anywhere}
-.pick small{display:block;font-family:var(--f-num);font-size:.75rem;color:var(--mute);line-height:1.4}
-.pick[aria-current="true"]{border-color:var(--brass);box-shadow:inset 4px 0 0 var(--brass)}
-.pick[aria-current="true"] .nm{font-weight:700}
-.tags{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap}
 .tag{font-size:.75rem;line-height:1.3;padding:0 6px;border:1px solid;border-radius:4px;background:var(--panel)}
 .tag.tame{color:var(--down);border-color:var(--down)}
 .tag.hane{color:var(--up);border-color:var(--up)}
-.del{flex:none;width:44px;height:44px;border:none;background:none;padding:0;color:var(--mute);font-size:1.1rem;border-radius:8px}
+.pbar{display:flex;gap:8px;align-items:center}
+#preset{flex:1 1 0;min-width:0;min-height:44px;font-size:1rem}
+#pdel{flex:none;min-height:44px}
+#pinfo{margin:8px 0 0;font-size:.75rem;color:var(--mute)}
+.v{font-family:var(--f-num);font-size:.9em;color:var(--mute)}
 #psave{min-height:44px}
 .note{font-size:.82rem;color:var(--mute);max-width:65ch;margin:0}
 @media (max-width:560px){
@@ -100,16 +95,6 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
       <div><small>スウィング比</small><b id="r-ratio">—</b></div>
       <div><small>1拍の長さ</small><b id="r-beat">—</b></div>
     </div>
-  </section>
-
-  <section class="panel">
-    <h2>誰風で吹く？</h2>
-    <div id="presets"></div>
-    <div class="custom">
-      <input type="text" id="pname" placeholder="名前（例：自分のノリ）" aria-label="プリセット名">
-      <button id="psave">今のノリを保存</button>
-    </div>
-    <p class="note" style="margin-top:12px">プレイヤーの値は、録音を 1 音ずつ測った研究（井上裕章ほか, 音楽知覚認知研究 23(1), 2017）の中央値。押すと録音のテンポになる。バディ・リッチはドラム（ハイハット）の値。保存したノリはこのブラウザにだけ残る。</p>
   </section>
 
   <section class="panel controls">
@@ -150,6 +135,20 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
         <label><input type="checkbox" id="m-mono">単音にする</label>
       </div>
     </div>
+  </section>
+
+  <section class="panel">
+    <h2 id="preset-h">誰風で吹く？</h2>
+    <div class="pbar">
+      <select id="preset" aria-labelledby="preset-h"></select>
+      <button id="pdel" hidden>削除</button>
+    </div>
+    <p id="pinfo"></p>
+    <div class="custom">
+      <input type="text" id="pname" placeholder="名前（例：自分のノリ）" aria-label="プリセット名">
+      <button id="psave">今のノリを保存</button>
+    </div>
+    <p class="note" style="margin-top:12px">プレイヤーの値は、録音を 1 音ずつ測った研究（井上裕章ほか, 音楽知覚認知研究 23(1), 2017）の中央値。押すと録音のテンポになる。バディ・リッチはドラム（ハイハット）の値。保存したノリはこのブラウザにだけ残る。</p>
   </section>
 </div>
 
@@ -202,56 +201,50 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   const KEY = 'nori-lab-presets';
   const loadMine = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
   const saveMine = a => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
-  let sel = null; // 選択中の行キー: 'p'+i（プレイヤー）/ 'b'+i（基本）/ 'm'+i（保存したノリ）/ null
-  const mark = () => document.querySelectorAll('#presets .pick').forEach(b => b.dataset.k === sel ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'));
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  function renderPresets(){
-    const pw = $('presets'); pw.replaceChildren();
-    // rows: [キー, 名前, サブ行, 遅れ値, ハネ値(%), 録音テンポ]
-    const group = (title, rows, mine) => {
-      if (!rows.length) return;
-      pw.appendChild(el('h3', null, title));
-      rows.forEach(([k, name, sub, lag, dist, bpm], i) => {
-        const row = el('div', 'prow'), b = el('button', 'pick'), info = el('span', 'info'), tags = el('span', 'tags');
-        b.dataset.k = k;
-        info.appendChild(el('span', 'nm', name));
-        if (sub) info.appendChild(el('small', null, sub));
-        tags.append(el('span', 'tag tame', tameTag(lag)), el('span', 'tag hane', haneTag(dist)));
-        b.append(info, tags);
-        b.addEventListener('click', () => { P.lag = lag; P.dist = dist; if (bpm) P.bpm = bpm; sync(); sel = k; mark(); });
-        row.appendChild(b);
-        if (mine) {
-          const x = el('button', 'del', '×'); x.setAttribute('aria-label', `${name} を削除`);
-          x.addEventListener('click', () => {
-            const a = loadMine(); a.splice(i, 1); saveMine(a);
-            const j = sel && sel[0] === 'm' ? +sel.slice(1) : -1;
-            if (j === i) sel = null; else if (j > i) sel = 'm' + (j - 1);
-            renderPresets();
-            const xs = pw.querySelectorAll('.del');
-            (xs[i] || xs[i - 1] || $('pname')).focus(); // 押した×は消えるので、隣の×か入力欄へ
-          });
-          row.appendChild(x);
-        }
-        pw.appendChild(row);
-      });
-    };
-    group('プレイヤー', PAPER.map((p, i) => ['p' + i, p[0], `${p[1]} · ${p[2]} · ${p[5]}bpm`, p[3], p[4], p[5]]));
-    group('基本', PRESETS.map((p, i) => ['b' + i, p[0], null, p[1], p[2]]));
-    group('保存したノリ', loadMine().map((p, i) => ['m' + i, p.name, null, p.lag, p.dist]), true);
-    mark();
+  const opt = (v, text) => { const o = el('option', null, text); o.value = v; return o; };
+  const grp = (label, opts) => { const g = el('optgroup'); g.label = label; g.append(...opts); return g; };
+  // 選択は #preset の value だけで持つ: '' =（自分で調整中）/ 'p'+i プレイヤー / 'b'+i 基本 / 'm'+i 保存したノリ
+  function renderOptions(v){
+    const mine = loadMine();
+    $('preset').replaceChildren(opt('', '（自分で調整中）'),
+      grp('プレイヤー', PAPER.map((p, i) => opt('p' + i, `${p[0]} — ${p[1]} '${String(p[2]).slice(2)}`))),
+      grp('基本', PRESETS.map((p, i) => opt('b' + i, p[0]))),
+      ...(mine.length ? [grp('保存したノリ', mine.map((p, i) => opt('m' + i, p.name)))] : []));
+    $('preset').value = v;
   }
+  function refresh(){
+    // タグは表示する丸めた値から決める（0.1399 が「ちょい後ろ 0.14」にならないように）
+    const l = +P.lag.toFixed(2), h = +(P.dist / 100).toFixed(2), v = $('preset').value;
+    $('pinfo').replaceChildren(el('span', 'tag tame', tameTag(l)), ' ', el('small', 'v', l.toFixed(2)), ' · ',
+      el('span', 'tag hane', haneTag(h * 100)), ' ', el('small', 'v', h.toFixed(2)), ' · ', el('small', 'v', `${P.bpm}bpm`));
+    $('pdel').hidden = !v.startsWith('m');
+    if (v.startsWith('m')) $('pdel').setAttribute('aria-label', `${loadMine()[+v.slice(1)].name} を削除`);
+  }
+  $('preset').addEventListener('change', e => {
+    const v = e.target.value, i = +v.slice(1), m = v[0] === 'm' && loadMine()[i];
+    const [lag, dist, bpm] = v[0] === 'p' ? PAPER[i].slice(3) : v[0] === 'b' ? PRESETS[i].slice(1) : m ? [m.lag, m.dist] : [];
+    if (v) { P.lag = lag; P.dist = dist; if (bpm) P.bpm = bpm; sync(); }
+    refresh();
+  });
+  $('pdel').addEventListener('click', e => {
+    const a = loadMine(); a.splice(+$('preset').value.slice(1), 1); saveMine(a);
+    renderOptions(''); refresh();
+    if (e.detail === 0) $('preset').focus(); // キーボード操作のときだけ。タップ後に focus すると iOS でピッカーが開くことがある
+  });
   $('psave').addEventListener('click', () => {
     const name = $('pname').value.trim() || `保存 ${loadMine().length + 1}`;
     const a = loadMine(); a.push({ name, lag:+P.lag.toFixed(4), dist:P.dist }); saveMine(a);
     $('pname').value = '';
     const n = loadMine().length;
-    if (n === a.length) sel = 'm' + (n - 1); // 保存に失敗したら（容量・プライベートモード）選択は動かさない
-    renderPresets();
+    renderOptions(n === a.length ? 'm' + (n - 1) : $('preset').value); // 保存に失敗したら（容量・プライベートモード）選択は動かさない
+    refresh();
   });
-  // 遅れ・ハネを動かしたら選択を外す（テンポだけなら残す）
+  // on(...) より後に登録するので、P が更新されてから refresh が走る
   [['delay-r','input'],['delay','change'],['lag-r','input'],['lag','change'],['dist-r','input'],['dist','change']]
-    .forEach(([id, ev]) => $(id).addEventListener(ev, () => { if (sel !== null) { sel = null; mark(); } }));
-  renderPresets();
+    .forEach(([id, ev]) => $(id).addEventListener(ev, () => { $('preset').value = ''; refresh(); }));
+  [['bpm-r','input'],['bpm','change']].forEach(([id, ev]) => $(id).addEventListener(ev, refresh));
+  renderOptions(''); refresh();
 
   function update(){
     const T = 60000 / P.bpm, hane = P.dist / 100;
