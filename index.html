@@ -239,21 +239,34 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+    // ライド右・ハット左に振って、同じ高域でも聞き分けられるようにする
+    const pan = v => { const p = ctx.createStereoPanner(); p.pan.value = v; p.connect(master); return p; };
+    ridePan = pan(0.35); hatPan = pan(-0.35);
+    // ライド: 808式の非整数比 square 6本を鳴らしっぱなしにして、VCA だけ叩くたびに開く
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+    rideVca = ctx.createGain(); rideVca.gain.value = 0;
+    hp.connect(rideVca).connect(ridePan);
+    [205.3, 304.4, 369.6, 522.7, 540, 800].forEach(f => {
+      const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * 1.4; o.connect(hp); o.start();
+    });
   }
-  function noiseHit(t, hp, dur, vol){
+  let ridePan, hatPan, rideVca;
+  function noiseHit(t, freq, dur, vol, dest = master, type = 'highpass'){
     const s = ctx.createBufferSource(); s.buffer = noiseBuf;
-    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
     const g = ctx.createGain();
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + dur + 0.02);
+    s.connect(f).connect(g).connect(dest); s.start(t); s.stop(t + dur + 0.02);
   }
-  const ride = t => { noiseHit(t, 5200, 0.35, 0.22); ping(t, 3700, 0.3, 0.025); };
-  const hihat = t => noiseHit(t, 8000, 0.05, 0.25);
-  function ping(t, f0, dur, vol){
-    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f0;
-    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t+dur);
-    o.connect(g).connect(master); o.start(t); o.stop(t+dur+0.02);
+  function ride(t){
+    const g = rideVca.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(0.05, t);
+    g.setTargetAtTime(0.012, t, 0.04);       // アタック直後にすっと落ちて
+    g.setTargetAtTime(0, t + 0.12, 0.5);     // 長めの余韻（wash）
+    noiseHit(t, 7000, 0.03, 0.12, ridePan);  // スティックの当たり
   }
+  // フットのハイハット「チッ」。ライドと帯域を分けるため bandpass
+  const hihat = t => noiseHit(t, 6000, 0.06, 0.45, hatPan, 'bandpass');
   function bass(t, midi, len){
     const f = 440 * Math.pow(2, (midi-69)/12);
     const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
