@@ -136,11 +136,13 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   <section class="panel">
     <h2>プリセット</h2>
     <div class="presets" id="presets"></div>
+    <h2 style="margin-top:16px">論文の測定値（中央値）</h2>
+    <div class="presets" id="paper"></div>
     <div class="custom">
       <input type="text" id="pname" placeholder="名前（例：Parker 1947）" aria-label="プリセット名">
       <button id="psave">今の遅れ値・ハネ値を保存</button>
     </div>
-    <p class="note" style="margin-top:12px">指標は井上裕章の論文・本と同じ定義（遅れ値＝ベースの拍頭に対する表拍の遅れ ÷ 1拍、ハネ値＝表拍8分の長さ ÷ 1拍、裏拍値＝遅れ値＋ハネ値）。プリセットは遅れ値で持つので、テンポを変えても同じノリのまま速さだけ変わる。点線のプリセットは自分で保存したもので、このブラウザにだけ残る。「レイドバック例」「前ノリ例」は聴き比べ用の仮の値で、本の測定値ではない。スペースキーでも再生／停止できる。</p>
+    <p class="note" style="margin-top:12px">指標は井上裕章の論文・本と同じ定義（遅れ値＝ベースの拍頭に対する表拍の遅れ ÷ 1拍、ハネ値＝表拍8分の長さ ÷ 1拍、裏拍値＝遅れ値＋ハネ値）。プリセットは遅れ値で持つので、テンポを変えても同じノリのまま速さだけ変わる。点線のプリセットは自分で保存したもので、このブラウザにだけ残る。「レイドバック例」「前ノリ例」は聴き比べ用の仮の値で、本の測定値ではない。「論文の測定値」は井上ほか（2017）表1の遅れ値・ハネ値の中央値で、押すとテンポも録音のテンポになる。Rich はソリストではなくドラムのハイハットの値。中央値どうしの和なので、表示される裏拍値は表1の裏拍値と 0.01 ずれることがある。スペースキーでも再生／停止できる。</p>
   </section>
 </div>
 
@@ -176,24 +178,38 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     ['レイドバック例', 0.1, 58],
     ['前ノリ例', -0.04, 64],
   ];
+  // 井上ほか（2017）表1 の中央値: [奏者 — 曲（録音年）, 遅れ値, ハネ値(%), 録音テンポ]
+  const PAPER = [
+    ["Hawkins — JATP Blues ('46)", 0, 66, 190],
+    ["Young — JATP Blues ('46)", 0.1, 60, 190],
+    ["Parker — JATP Blues ('46)", 0.19, 60, 190],
+    ["Rich（ハイハット）— JATP Blues ('46)", 0, 72, 190],
+    ["Hawkins — Fine Dinner ('39)", 0, 64, 173],
+    ["Young — Way Down Yonder In New Orleans ('38)", 0.1, 58, 192],
+    ["Parker — Red Cross take1 ('44)", 0.2, 59, 200],
+    ["Parker — Billie's Bounce take1 ('45)", 0.19, 60, 168],
+    ["Davis — Billie's Bounce take1 ('45)", 0.16, 59, 168],
+  ];
   const KEY = 'nori-lab-presets';
   const loadMine = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
   const saveMine = a => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
   const fmt = (lag, s) => `遅れ ${lag>0?'+':''}${(+lag).toFixed(3)} / ハネ ${(s/100).toFixed(3)}`;
   function renderPresets(){
     const pw = $('presets'); pw.innerHTML = '';
-    const mk = (name, lag, s, mine, i) => {
+    const mk = (name, lag, s, mine, i, bpm, wrap = pw) => {
       const b = document.createElement('button');
       if (mine) b.className = 'mine';
-      b.innerHTML = `${name.replace(/[<>&]/g,'')}<b>${fmt(lag, s)}</b>`;
+      b.innerHTML = `${name.replace(/[<>&]/g,'')}<b>${fmt(lag, s)}${bpm ? ` / ${bpm}bpm` : ''}</b>`;
       b.addEventListener('click', e => {
         if (e.target.classList.contains('del')) { const a = loadMine(); a.splice(i,1); saveMine(a); renderPresets(); return; }
-        P.lag = lag; P.dist = s; sync();
+        P.lag = lag; P.dist = s; if (bpm) P.bpm = bpm; sync();
       });
       if (mine) { const x = document.createElement('span'); x.className = 'del'; x.textContent = '×'; x.title = '削除'; b.appendChild(x); }
-      pw.appendChild(b);
+      wrap.appendChild(b);
     };
     PRESETS.forEach(p => mk(p[0], p[1], p[2], false));
+    $('paper').innerHTML = '';
+    PAPER.forEach(p => mk(p[0], p[1], p[2], false, -1, p[3], $('paper')));
     loadMine().forEach((p, i) => mk(p.name, p.lag, p.dist, true, i));
   }
   $('psave').addEventListener('click', () => {
