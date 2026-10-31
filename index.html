@@ -31,9 +31,7 @@ canvas{display:block;width:100%;height:170px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;color:var(--mute);margin-top:10px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .custom{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
-.custom input{font:inherit;font-size:.9rem;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;flex:1 1 12em;max-width:18em}
-.presets .mine{border-style:dashed}
-.presets .del{border:none;background:none;padding:0 0 0 8px;color:var(--mute);font-size:.9rem}
+.custom input{font:inherit;font-size:1rem;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;flex:1 1 12em;max-width:18em}
 .readout{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
 .readout div{min-width:0}
 .readout small{display:block;font-size:.72rem;color:var(--mute);letter-spacing:.04em}
@@ -57,9 +55,15 @@ select{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(
 .chk label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .chk input{accent-color:var(--brass)}
 h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-weight:700}
-.presets{display:flex;flex-wrap:wrap;gap:8px}
-.presets button{border-radius:6px;font-size:.85rem}
-.presets button b{font-family:var(--f-num);font-weight:400;color:var(--mute);margin-left:6px;font-size:.75rem}
+.tag{font-size:.75rem;line-height:1.3;padding:0 6px;border:1px solid;border-radius:4px;background:var(--panel)}
+.tag.tame{color:var(--down);border-color:var(--down)}
+.tag.hane{color:var(--up);border-color:var(--up)}
+.pbar{display:flex;gap:8px;align-items:center}
+#preset{flex:1 1 0;min-width:0;min-height:44px;font-size:1rem}
+#pdel{flex:none;min-height:44px}
+#pinfo{margin:8px 0 0;font-size:.75rem;color:var(--mute)}
+.v{font-family:var(--f-num);font-size:.9em;color:var(--mute)}
+#psave{min-height:44px}
 .note{font-size:.82rem;color:var(--mute);max-width:65ch;margin:0}
 @media (max-width:560px){
   .row{grid-template-columns:1fr 6.5em}
@@ -134,15 +138,17 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   </section>
 
   <section class="panel">
-    <h2>プリセット</h2>
-    <div class="presets" id="presets"></div>
-    <h2 style="margin-top:16px">論文の測定値（中央値）</h2>
-    <div class="presets" id="paper"></div>
-    <div class="custom">
-      <input type="text" id="pname" placeholder="名前（例：Parker 1947）" aria-label="プリセット名">
-      <button id="psave">今の遅れ値・ハネ値を保存</button>
+    <h2 id="preset-h">誰風で吹く？</h2>
+    <div class="pbar">
+      <select id="preset" aria-labelledby="preset-h"></select>
+      <button id="pdel" hidden>削除</button>
     </div>
-    <p class="note" style="margin-top:12px">指標は井上裕章の論文・本と同じ定義（遅れ値＝ベースの拍頭に対する表拍の遅れ ÷ 1拍、ハネ値＝表拍8分の長さ ÷ 1拍、裏拍値＝遅れ値＋ハネ値）。プリセットは遅れ値で持つので、テンポを変えても同じノリのまま速さだけ変わる。点線のプリセットは自分で保存したもので、このブラウザにだけ残る。「レイドバック例」「前ノリ例」は聴き比べ用の仮の値で、本の測定値ではない。「論文の測定値」は井上ほか（2017）表1の遅れ値・ハネ値の中央値で、押すとテンポも録音のテンポになる。Rich はソリストではなくドラムのハイハットの値。中央値どうしの和なので、表示される裏拍値は表1の裏拍値と 0.01 ずれることがある。スペースキーでも再生／停止できる。</p>
+    <p id="pinfo"></p>
+    <div class="custom">
+      <input type="text" id="pname" placeholder="名前（例：自分のノリ）" aria-label="プリセット名">
+      <button id="psave">今のノリを保存</button>
+    </div>
+    <p class="note" style="margin-top:12px">プレイヤーの値は、録音を 1 音ずつ測った研究（井上裕章ほか, 音楽知覚認知研究 23(1), 2017）の中央値。押すと録音のテンポになる。バディ・リッチはドラム（ハイハット）の値。保存したノリはこのブラウザにだけ残る。スペースキーで再生／停止。</p>
   </section>
 </div>
 
@@ -171,53 +177,74 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 
   // [名前, 遅れ値, ハネ値(%)]
   const PRESETS = [
-    ['ストレート', 0, 50],
-    ['3連スウィング', 0, 66.7],
-    ['付点（3:1）', 0, 75],
+    ['イーブン（ストレート）', 0, 50],
+    ['3連', 0, 66.7],
+    ['付点（ハネ強め）', 0, 75],
     ['軽めの跳ね', 0, 58],
-    ['レイドバック例', 0.1, 58],
-    ['前ノリ例', -0.04, 64],
+    ['後ろノリの例', 0.1, 58],
+    ['前ノリの例', -0.04, 64],
   ];
-  // 井上ほか（2017）表1 の中央値: [奏者 — 曲（録音年）, 遅れ値, ハネ値(%), 録音テンポ]
+  // 井上ほか（2017）表1 の中央値: [奏者, 曲, 録音年, 遅れ値, ハネ値(%), 録音テンポ]。Red Cross / Billie's Bounce は take1
   const PAPER = [
-    ["Hawkins — JATP Blues ('46)", 0, 66, 190],
-    ["Young — JATP Blues ('46)", 0.1, 60, 190],
-    ["Parker — JATP Blues ('46)", 0.19, 60, 190],
-    ["Rich（ハイハット）— JATP Blues ('46)", 0, 72, 190],
-    ["Hawkins — Fine Dinner ('39)", 0, 64, 173],
-    ["Young — Way Down Yonder In New Orleans ('38)", 0.1, 58, 192],
-    ["Parker — Red Cross take1 ('44)", 0.2, 59, 200],
-    ["Parker — Billie's Bounce take1 ('45)", 0.19, 60, 168],
-    ["Davis — Billie's Bounce take1 ('45)", 0.16, 59, 168],
+    ['チャーリー・パーカー', 'Red Cross', 1944, 0.2, 59, 200],
+    ['チャーリー・パーカー', "Billie's Bounce", 1945, 0.19, 60, 168],
+    ['チャーリー・パーカー', 'JATP Blues', 1946, 0.19, 60, 190],
+    ['マイルス・デイヴィス', "Billie's Bounce", 1945, 0.16, 59, 168],
+    ['レスター・ヤング', 'Way Down Yonder In New Orleans', 1938, 0.1, 58, 192],
+    ['レスター・ヤング', 'JATP Blues', 1946, 0.1, 60, 190],
+    ['コールマン・ホーキンス', 'Fine Dinner', 1939, 0, 64, 173],
+    ['コールマン・ホーキンス', 'JATP Blues', 1946, 0, 66, 190],
+    ['バディ・リッチ（ドラム）', 'JATP Blues', 1946, 0, 72, 190],
   ];
+  const tameTag = lag => lag <= -0.02 ? '前ノリ' : lag < 0.04 ? 'ジャスト' : lag < 0.14 ? 'ちょい後ろ' : 'かなり後ろ';
+  const haneTag = dist => dist < 54 ? 'まっすぐ' : dist < 62 ? '軽く跳ねる' : dist < 69 ? '3連くらい' : '強く跳ねる';
   const KEY = 'nori-lab-presets';
   const loadMine = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
   const saveMine = a => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
-  const fmt = (lag, s) => `遅れ ${lag>0?'+':''}${(+lag).toFixed(3)} / ハネ ${(s/100).toFixed(3)}`;
-  function renderPresets(){
-    const pw = $('presets'); pw.innerHTML = '';
-    const mk = (name, lag, s, mine, i, bpm, wrap = pw) => {
-      const b = document.createElement('button');
-      if (mine) b.className = 'mine';
-      b.innerHTML = `${name.replace(/[<>&]/g,'')}<b>${fmt(lag, s)}${bpm ? ` / ${bpm}bpm` : ''}</b>`;
-      b.addEventListener('click', e => {
-        if (e.target.classList.contains('del')) { const a = loadMine(); a.splice(i,1); saveMine(a); renderPresets(); return; }
-        P.lag = lag; P.dist = s; if (bpm) P.bpm = bpm; sync();
-      });
-      if (mine) { const x = document.createElement('span'); x.className = 'del'; x.textContent = '×'; x.title = '削除'; b.appendChild(x); }
-      wrap.appendChild(b);
-    };
-    PRESETS.forEach(p => mk(p[0], p[1], p[2], false));
-    $('paper').innerHTML = '';
-    PAPER.forEach(p => mk(p[0], p[1], p[2], false, -1, p[3], $('paper')));
-    loadMine().forEach((p, i) => mk(p.name, p.lag, p.dist, true, i));
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const opt = (v, text) => { const o = el('option', null, text); o.value = v; return o; };
+  const grp = (label, opts) => { const g = el('optgroup'); g.label = label; g.append(...opts); return g; };
+  // 選択は #preset の value だけで持つ: '' =（自分で調整中）/ 'p'+i プレイヤー / 'b'+i 基本 / 'm'+i 保存したノリ
+  function renderOptions(v){
+    const mine = loadMine();
+    $('preset').replaceChildren(opt('', '（自分で調整中）'),
+      grp('プレイヤー', PAPER.map((p, i) => opt('p' + i, `${p[0]} — ${p[1]} '${String(p[2]).slice(2)}`))),
+      grp('基本', PRESETS.map((p, i) => opt('b' + i, p[0]))),
+      ...(mine.length ? [grp('保存したノリ', mine.map((p, i) => opt('m' + i, p.name)))] : []));
+    $('preset').value = v;
   }
+  function refresh(){
+    // タグは表示する丸めた値から決める（0.1399 が「ちょい後ろ 0.14」にならないように）
+    const l = +P.lag.toFixed(2), h = +(P.dist / 100).toFixed(2), v = $('preset').value;
+    $('pinfo').replaceChildren(el('span', 'tag tame', tameTag(l)), ' ', el('small', 'v', l.toFixed(2)), ' · ',
+      el('span', 'tag hane', haneTag(h * 100)), ' ', el('small', 'v', h.toFixed(2)), ' · ', el('small', 'v', `${P.bpm}bpm`));
+    $('pdel').hidden = !v.startsWith('m');
+    if (v.startsWith('m')) $('pdel').setAttribute('aria-label', `${loadMine()[+v.slice(1)].name} を削除`);
+  }
+  $('preset').addEventListener('change', e => {
+    const v = e.target.value, i = +v.slice(1), m = v[0] === 'm' && loadMine()[i];
+    const [lag, dist, bpm] = v[0] === 'p' ? PAPER[i].slice(3) : v[0] === 'b' ? PRESETS[i].slice(1) : m ? [m.lag, m.dist] : [];
+    if (v) { P.lag = lag; P.dist = dist; if (bpm) P.bpm = bpm; sync(); }
+    refresh();
+  });
+  $('pdel').addEventListener('click', e => {
+    const a = loadMine(); a.splice(+$('preset').value.slice(1), 1); saveMine(a);
+    renderOptions(''); refresh();
+    if (e.detail === 0) $('preset').focus(); // キーボード操作のときだけ。タップ後に focus すると iOS でピッカーが開くことがある
+  });
   $('psave').addEventListener('click', () => {
     const name = $('pname').value.trim() || `保存 ${loadMine().length + 1}`;
     const a = loadMine(); a.push({ name, lag:+P.lag.toFixed(4), dist:P.dist }); saveMine(a);
-    $('pname').value = ''; renderPresets();
+    $('pname').value = '';
+    const n = loadMine().length;
+    renderOptions(n === a.length ? 'm' + (n - 1) : $('preset').value); // 保存に失敗したら（容量・プライベートモード）選択は動かさない
+    refresh();
   });
-  renderPresets();
+  // on(...) より後に登録するので、P が更新されてから refresh が走る
+  [['delay-r','input'],['delay','change'],['lag-r','input'],['lag','change'],['dist-r','input'],['dist','change']]
+    .forEach(([id, ev]) => $(id).addEventListener(ev, () => { $('preset').value = ''; refresh(); }));
+  [['bpm-r','input'],['bpm','change']].forEach(([id, ev]) => $(id).addEventListener(ev, refresh));
+  renderOptions(''); refresh();
 
   function update(){
     const T = 60000 / P.bpm, hane = P.dist / 100;
@@ -239,21 +266,34 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+    // ライド右・ハット左に振って、同じ高域でも聞き分けられるようにする
+    const pan = v => { const p = ctx.createStereoPanner(); p.pan.value = v; p.connect(master); return p; };
+    ridePan = pan(0.35); hatPan = pan(-0.35);
+    // ライド: 808式の非整数比 square 6本を鳴らしっぱなしにして、VCA だけ叩くたびに開く
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
+    rideVca = ctx.createGain(); rideVca.gain.value = 0;
+    hp.connect(rideVca).connect(ridePan);
+    [205.3, 304.4, 369.6, 522.7, 540, 800].forEach(f => {
+      const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * 1.4; o.connect(hp); o.start();
+    });
   }
-  function noiseHit(t, hp, dur, vol){
+  let ridePan, hatPan, rideVca;
+  function noiseHit(t, freq, dur, vol, dest = master, type = 'highpass'){
     const s = ctx.createBufferSource(); s.buffer = noiseBuf;
-    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
     const g = ctx.createGain();
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + dur + 0.02);
+    s.connect(f).connect(g).connect(dest); s.start(t); s.stop(t + dur + 0.02);
   }
-  const ride = t => { noiseHit(t, 5200, 0.35, 0.22); ping(t, 3700, 0.3, 0.025); };
-  const hihat = t => noiseHit(t, 8000, 0.05, 0.25);
-  function ping(t, f0, dur, vol){
-    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f0;
-    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t+dur);
-    o.connect(g).connect(master); o.start(t); o.stop(t+dur+0.02);
+  function ride(t){
+    const g = rideVca.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(0.05, t);
+    g.setTargetAtTime(0.012, t, 0.04);       // アタック直後にすっと落ちて
+    g.setTargetAtTime(0, t + 0.12, 0.5);     // 長めの余韻（wash）
+    noiseHit(t, 7000, 0.03, 0.12, ridePan);  // スティックの当たり
   }
+  // フットのハイハット「チッ」。ライドと帯域を分けるため bandpass
+  const hihat = t => noiseHit(t, 6000, 0.06, 0.45, hatPan, 'bandpass');
   function bass(t, midi, len){
     const f = 440 * Math.pow(2, (midi-69)/12);
     const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
@@ -395,7 +435,8 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   }
   $('play').addEventListener('click', () => playing ? stop() : start());
   document.addEventListener('keydown', e => {
-    if (e.code === 'Space' && !(e.target instanceof HTMLInputElement && e.target.type === 'number')) {
+    const t = e.target, skip = t instanceof HTMLSelectElement || t instanceof HTMLButtonElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type !== 'range');
+    if (e.code === 'Space' && !skip) {
       e.preventDefault(); playing ? stop() : start();
     }
   });
