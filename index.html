@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ノリ・ラボ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
+<style>
+/* Layout: 計測器のパネル。上に波形窓（タイミング表示）、下に3本のフェーダーと操作列 */
+:root{
+  --bg:#e9ecef; --panel:#f7f8f9; --ink:#1b2027; --mute:#5d6672; --line:#c9cfd6;
+  --brass:#a8701a; --down:#2f5f8f; --up:#b5482f; --grid:#9aa3ad;
+  --f-body:"Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --f-num:"DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14181d; --panel:#1c2229; --ink:#e6e9ec; --mute:#97a1ac; --line:#2e3741;
+  --brass:#d9a24a; --down:#7fb0e0; --up:#f08a6c; --grid:#4d5864; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14181d; --panel:#1c2229; --ink:#e6e9ec; --mute:#97a1ac; --line:#2e3741;
+  --brass:#d9a24a; --down:#7fb0e0; --up:#f08a6c; --grid:#4d5864; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 20px}
+h1{font-weight:900;font-size:1.9rem;letter-spacing:.02em;margin:0;text-wrap:balance}
+h1 span{color:var(--brass)}
+.sub{color:var(--mute);font-size:.9rem;margin:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.scope{position:relative}
+canvas{display:block;width:100%;height:170px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;color:var(--mute);margin-top:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.custom{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+.custom input{font:inherit;font-size:.9rem;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;flex:1 1 12em;max-width:18em}
+.presets .mine{border-style:dashed}
+.presets .del{border:none;background:none;padding:0 0 0 8px;color:var(--mute);font-size:.9rem}
+.readout{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+.readout div{min-width:0}
+.readout small{display:block;font-size:.72rem;color:var(--mute);letter-spacing:.04em}
+.readout b{font-family:var(--f-num);font-weight:500;font-size:1.15rem;font-variant-numeric:tabular-nums}
+.controls{display:flex;flex-direction:column;gap:18px}
+.row{display:grid;grid-template-columns:9.5em 1fr 6.5em;align-items:center;gap:14px}
+.row label{font-weight:700;font-size:.95rem}
+.row label em{display:block;font-style:normal;font-weight:400;font-size:.72rem;color:var(--mute)}
+.num{display:flex;align-items:center;gap:4px;font-family:var(--f-num)}
+.num input{width:100%;min-width:0;font:inherit;font-size:1rem;padding:6px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);text-align:right}
+.num span{font-size:.75rem;color:var(--mute)}
+input[type=range]{width:100%;accent-color:var(--brass)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer}
+button:hover{border-color:var(--brass)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+select{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:7px 12px;max-width:100%}
+#play{background:var(--brass);border-color:var(--brass);color:#fff;font-weight:700;padding:10px 26px;font-size:1rem}
+#play[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chk{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.88rem}
+.chk label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.chk input{accent-color:var(--brass)}
+h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-weight:700}
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+.presets button{border-radius:6px;font-size:.85rem}
+.presets button b{font-family:var(--f-num);font-weight:400;color:var(--mute);margin-left:6px;font-size:.75rem}
+.note{font-size:.82rem;color:var(--mute);max-width:65ch;margin:0}
+@media (max-width:560px){
+  .row{grid-template-columns:1fr 6.5em}
+  .row label{grid-column:1/-1}
+  .readout{grid-template-columns:repeat(3,minmax(0,1fr))}
+  h1{font-size:1.5rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>ノリ・<span>ラボ</span></h1>
+    <p class="sub">表拍の遅れ × 裏拍の距離で 8分音符を鳴らし続ける</p>
+  </header>
+
+  <section class="panel scope">
+    <canvas id="cv" aria-label="2拍分のタイミング表示"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--grid)"></i>ビート（リズム隊のグリッド）</span>
+      <span><i style="background:var(--down)"></i>表拍の8分</span>
+      <span><i style="background:var(--up)"></i>裏拍の8分</span>
+      <span><i style="background:var(--grid);opacity:.4"></i>ストレートの裏（50%）</span>
+    </div>
+    <div class="readout">
+      <div><small>遅れ値</small><b id="r-lag">—</b></div>
+      <div><small>ハネ値</small><b id="r-hane">—</b></div>
+      <div><small>裏拍値</small><b id="r-ura">—</b></div>
+      <div><small>スウィング比</small><b id="r-ratio">—</b></div>
+      <div><small>1拍の長さ</small><b id="r-beat">—</b></div>
+    </div>
+  </section>
+
+  <section class="panel controls">
+    <div class="row">
+      <label for="bpm">テンポ<em>BPM（4分音符）</em></label>
+      <input type="range" id="bpm-r" min="60" max="320" step="1" value="180" aria-label="テンポ">
+      <div class="num"><input type="number" id="bpm" min="40" max="400" step="1" value="180"><span>bpm</span></div>
+    </div>
+    <div class="row">
+      <label for="delay">表拍の遅れ<em>ビートからのズレ。マイナスで前ノリ</em></label>
+      <input type="range" id="delay-r" min="-80" max="120" step="1" value="25" aria-label="表拍の遅れ">
+      <div class="num"><input type="number" id="delay" min="-150" max="200" step="1" value="25"><span>ms</span></div>
+    </div>
+    <div class="row">
+      <label for="lag">遅れ値<em>表拍の遅れ ÷ 1拍。テンポを変えても保たれる</em></label>
+      <input type="range" id="lag-r" min="-0.15" max="0.3" step="0.005" value="0.075" aria-label="遅れ値">
+      <div class="num"><input type="number" id="lag" min="-0.5" max="0.5" step="0.005" value="0.075"><span>拍</span></div>
+    </div>
+    <div class="row">
+      <label for="dist">ハネ値<em>表拍8分の長さ ÷ 1拍（=表拍から裏拍までの距離）</em></label>
+      <input type="range" id="dist-r" min="40" max="80" step="0.5" value="60" aria-label="裏拍の距離">
+      <div class="num"><input type="number" id="dist" min="30" max="90" step="0.5" value="60"><span>%</span></div>
+    </div>
+
+    <div class="bar">
+      <button id="play" aria-pressed="false">▶ 再生</button>
+      <select id="prog" aria-label="コード進行">
+        <option value="blues">B♭ブルース（12小節）</option>
+        <option value="rhythm">循環（リズム・チェンジ A）</option>
+        <option value="iivi">II–V–I（B♭）</option>
+        <option value="one">ワンコード（B♭7）</option>
+      </select>
+      <div class="chk">
+        <label><input type="checkbox" id="m-ride" checked>ライド（4分）</label>
+        <label><input type="checkbox" id="m-hh" checked>ハイハット（2・4）</label>
+        <label><input type="checkbox" id="m-bass" checked>ベース（4分）</label>
+        <label><input type="checkbox" id="m-acc">裏拍アクセント</label>
+        <label><input type="checkbox" id="m-mono">単音にする</label>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>プリセット</h2>
+    <div class="presets" id="presets"></div>
+    <div class="custom">
+      <input type="text" id="pname" placeholder="名前（例：Parker 1947）" aria-label="プリセット名">
+      <button id="psave">今の遅れ値・ハネ値を保存</button>
+    </div>
+    <p class="note" style="margin-top:12px">指標は井上裕章の論文・本と同じ定義（遅れ値＝ベースの拍頭に対する表拍の遅れ ÷ 1拍、ハネ値＝表拍8分の長さ ÷ 1拍、裏拍値＝遅れ値＋ハネ値）。プリセットは遅れ値で持つので、テンポを変えても同じノリのまま速さだけ変わる。点線のプリセットは自分で保存したもので、このブラウザにだけ残る。「レイドバック例」「前ノリ例」は聴き比べ用の仮の値で、本の測定値ではない。スペースキーでも再生／停止できる。</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  // 遅れは「遅れ値（拍比）」で持ち、ms は表示と入力のための換算値
+  const P = { bpm:180, lag:0.075, dist:60 };
+  Object.defineProperty(P, 'delay', { get(){ return P.lag * 60000 / P.bpm; } });
+
+  // ---- 入力のひも付け ----
+  function sync(){
+    const ms = Math.round(P.delay);
+    $('bpm-r').value = P.bpm; $('bpm').value = P.bpm;
+    $('delay-r').value = ms; $('delay').value = ms;
+    $('lag-r').value = P.lag; $('lag').value = +P.lag.toFixed(3);
+    $('dist-r').value = P.dist; $('dist').value = P.dist;
+    update();
+  }
+  const num = v => { v = Number(v); return isFinite(v) ? v : null; };
+  const on = (ids, fn) => ids.forEach(([id, ev]) => $(id).addEventListener(ev, e => { const v = num(e.target.value); if (v !== null) { fn(v); sync(); } }));
+  on([['bpm-r','input'],['bpm','change']], v => { if (v > 0) P.bpm = v; });
+  on([['delay-r','input'],['delay','change']], v => { P.lag = v / (60000 / P.bpm); });
+  on([['lag-r','input'],['lag','change']], v => { P.lag = v; });
+  on([['dist-r','input'],['dist','change']], v => { P.dist = v; });
+
+  // [名前, 遅れ値, ハネ値(%)]
+  const PRESETS = [
+    ['ストレート', 0, 50],
+    ['3連スウィング', 0, 66.7],
+    ['付点（3:1）', 0, 75],
+    ['軽めの跳ね', 0, 58],
+    ['レイドバック例', 0.1, 58],
+    ['前ノリ例', -0.04, 64],
+  ];
+  const KEY = 'nori-lab-presets';
+  const loadMine = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
+  const saveMine = a => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
+  const fmt = (lag, s) => `遅れ ${lag>0?'+':''}${(+lag).toFixed(3)} / ハネ ${(s/100).toFixed(3)}`;
+  function renderPresets(){
+    const pw = $('presets'); pw.innerHTML = '';
+    const mk = (name, lag, s, mine, i) => {
+      const b = document.createElement('button');
+      if (mine) b.className = 'mine';
+      b.innerHTML = `${name.replace(/[<>&]/g,'')}<b>${fmt(lag, s)}</b>`;
+      b.addEventListener('click', e => {
+        if (e.target.classList.contains('del')) { const a = loadMine(); a.splice(i,1); saveMine(a); renderPresets(); return; }
+        P.lag = lag; P.dist = s; sync();
+      });
+      if (mine) { const x = document.createElement('span'); x.className = 'del'; x.textContent = '×'; x.title = '削除'; b.appendChild(x); }
+      pw.appendChild(b);
+    };
+    PRESETS.forEach(p => mk(p[0], p[1], p[2], false));
+    loadMine().forEach((p, i) => mk(p.name, p.lag, p.dist, true, i));
+  }
+  $('psave').addEventListener('click', () => {
+    const name = $('pname').value.trim() || `保存 ${loadMine().length + 1}`;
+    const a = loadMine(); a.push({ name, lag:+P.lag.toFixed(4), dist:P.dist }); saveMine(a);
+    $('pname').value = ''; renderPresets();
+  });
+  renderPresets();
+
+  function update(){
+    const T = 60000 / P.bpm, hane = P.dist / 100;
+    $('r-beat').textContent = T.toFixed(0) + ' ms';
+    $('r-ratio').textContent = (hane / (1 - hane)).toFixed(2) + ' : 1';
+    $('r-lag').textContent = (P.lag>0?'+':'') + P.lag.toFixed(3);
+    $('r-hane').textContent = hane.toFixed(3);
+    $('r-ura').textContent = (P.lag + hane).toFixed(3);
+    draw();
+  }
+
+  // ---- 音 ----
+  let ctx = null, master, noiseBuf;
+  function initAudio(){
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = 0.8;
+    const comp = ctx.createDynamicsCompressor();
+    master.connect(comp).connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+  }
+  function noiseHit(t, hp, dur, vol){
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + dur + 0.02);
+  }
+  const ride = t => { noiseHit(t, 5200, 0.35, 0.22); ping(t, 3700, 0.3, 0.025); };
+  const hihat = t => noiseHit(t, 8000, 0.05, 0.25);
+  function ping(t, f0, dur, vol){
+    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f0;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t+dur);
+    o.connect(g).connect(master); o.start(t); o.stop(t+dur+0.02);
+  }
+  function bass(t, midi, len){
+    const f = 440 * Math.pow(2, (midi-69)/12);
+    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = f;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.42, t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.12, t+0.12); g.gain.exponentialRampToValueAtTime(0.001, t+len);
+    o.connect(g); o2.connect(g); g.connect(master);
+    o.start(t); o2.start(t); o.stop(t+len+0.02); o2.stop(t+len+0.02);
+  }
+  function horn(t, midi, len, vol){
+    const f = 440 * Math.pow(2, (midi-69)/12);
+    const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = 'square'; o2.frequency.value = f * 1.003;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2;
+    lp.frequency.setValueAtTime(900, t); lp.frequency.linearRampToValueAtTime(2600, t+0.025);
+    lp.frequency.exponentialRampToValueAtTime(1300, t+Math.max(0.05,len));
+    const g = ctx.createGain(); const m = ctx.createGain(); m.gain.value = 0.5;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t+0.012);
+    g.gain.setValueAtTime(vol*0.8, t+Math.max(0.02,len*0.6)); g.gain.linearRampToValueAtTime(0, t+len);
+    o1.connect(lp); o2.connect(m).connect(lp); lp.connect(g).connect(master);
+    o1.start(t); o2.start(t); o1.stop(t+len+0.02); o2.stop(t+len+0.02);
+  }
+
+  // ---- コード進行 ----
+  const PC = {C:0,Db:1,D:2,Eb:3,E:4,F:5,Gb:6,G:7,Ab:8,A:9,Bb:10,B:11};
+  const Q = {
+    '7':   {t:[0,4,7,10], s:[0,2,4,5,7,9,10]},
+    'm7':  {t:[0,3,7,10], s:[0,2,3,5,7,9,10]},
+    '6':   {t:[0,4,7,9],  s:[0,2,4,5,7,9,11]},
+    'maj7':{t:[0,4,7,11], s:[0,2,4,5,7,9,11]},
+    'dim7':{t:[0,3,6,9],  s:[0,2,3,5,6,8,9,11]},
+  };
+  const PROGS = {
+    blues: [['Bb','7',4],['Eb','7',4],['Bb','7',4],['F','m7',2],['Bb','7',2],['Eb','7',4],['E','dim7',4],
+            ['Bb','7',4],['G','7',4],['C','m7',4],['F','7',4],['Bb','7',2],['G','7',2],['C','m7',2],['F','7',2]],
+    rhythm:[['Bb','6',2],['G','7',2],['C','m7',2],['F','7',2],['Bb','6',2],['G','7',2],['C','m7',2],['F','7',2],
+            ['F','m7',2],['Bb','7',2],['Eb','6',2],['E','dim7',2],['D','m7',2],['G','7',2],['C','m7',2],['F','7',2]],
+    iivi:  [['C','m7',4],['F','7',4],['Bb','maj7',8]],
+    one:   [['Bb','7',4]],
+  };
+  let BEATS = [];
+  function buildProg(){
+    BEATS = []; let seg = 0;
+    for (const [r, q, n] of PROGS[$('prog').value]) {
+      const ch = { root:PC[r], q:Q[q], name: r.replace('b','♭') + (q === 'dim7' ? '°7' : q) };
+      for (let i = 0; i < n; i++) BEATS.push({ ch, seg, first: i === 0, last: i === n - 1 });
+      seg++;
+    }
+  }
+  buildProg(); $('prog').addEventListener('change', buildProg);
+  const beatAt = i => BEATS[((i % BEATS.length) + BEATS.length) % BEATS.length];
+  const pcs = (ch, key) => ch.q[key].map(x => (x + ch.root) % 12);
+  const inRange = (pcList, lo, hi) => { const a = []; for (let m = lo; m <= hi; m++) if (pcList.includes(m % 12)) a.push(m); return a; };
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  // ---- メロディ生成：拍頭にコードトーン、裏拍は経過音／半音アプローチ ----
+  const LO = 58, HI = 82;
+  const mel = { cur:null, dir:1 };
+  function melodyBeat(i){
+    const ch = beatAt(i).ch, nx = beatAt(i + 1).ch;
+    if (mel.cur === null) { const c = inRange(pcs(ch,'t'), 66, 74); mel.cur = pick(c); }
+    const down = mel.cur;
+    if (Math.random() < 0.18) mel.dir *= -1;
+    if (down >= HI - 4) mel.dir = -1; if (down <= LO + 4) mel.dir = 1;
+    const tones = inRange(pcs(nx,'t'), LO, HI);
+    const leap = Math.random() < 0.1;
+    const want = m => { const d = (m - down) * mel.dir; return leap ? d >= 6 && d <= 9 : d >= 1 && d <= 5; };
+    let c = tones.filter(want);
+    if (!c.length) { mel.dir *= -1; c = tones.filter(want); }
+    if (!c.length) c = tones.filter(m => m !== down && Math.abs(m - down) <= 7);
+    const target = c.length ? pick(c) : down;
+    const diff = target - down, sg = Math.sign(diff) || 1;
+    let up;
+    const between = inRange(pcs(ch,'s'), Math.min(down,target) + 1, Math.max(down,target) - 1);
+    if (Math.abs(diff) >= 3 && between.length && Math.random() < 0.7) {
+      up = between.reduce((a, b) => Math.abs(b - (down+target)/2) < Math.abs(a - (down+target)/2) ? b : a);
+    } else if (Math.random() < 0.5 && target - sg !== down) {
+      up = target - sg;              // 半音下（上）から入る
+    } else {
+      up = target + sg;              // いったん越えてから戻る
+      if (up === down) up = target - sg;
+    }
+    mel.cur = target;
+    return [down, Math.max(LO - 2, Math.min(HI + 2, up))];
+  }
+
+  // ---- ウォーキングベース ----
+  let bcur = 46;
+  const near = (cands, ref) => !cands.length ? ref : cands.reduce((a, b) => Math.abs(b - ref) < Math.abs(a - ref) ? b : a);
+  function bassBeat(i){
+    const b = beatAt(i), nb = beatAt(i + 1);
+    let n;
+    if (b.first) n = near(inRange([b.ch.root], 36, 50), bcur);
+    else if (b.last) { const r = near(inRange([nb.ch.root], 36, 52), bcur); n = r + (Math.random() < 0.5 ? 1 : -1); }
+    else n = near(inRange(pcs(b.ch,'t').filter(p => p !== b.ch.root), 36, 52).filter(m => m !== bcur), bcur + (Math.random() < 0.5 ? 3 : -3));
+    bcur = n; return n;
+  }
+  let curChord = '';
+
+  // ---- スケジューラ ----
+  let playing = false, timer = null, nextBeat = 0, beatIdx = 0, noteIdx = 0;
+  const beatLog = []; // [time, idx]
+  const LOOK = 0.15;
+  function tick(){
+    const now = ctx.currentTime;
+    while (nextBeat < now + LOOK) {
+      const T = 60 / P.bpm, d = P.delay/1000, s = P.dist/100;
+      const bt = nextBeat;
+      beatLog.push([bt, beatIdx, beatAt(beatIdx).ch.name]); if (beatLog.length > 16) beatLog.shift();
+      if ($('m-ride').checked) ride(bt);
+      if ($('m-hh').checked && beatIdx % 2 === 1) hihat(bt);
+      const bn = bassBeat(beatIdx);
+      if ($('m-bass').checked) bass(bt, bn, T*0.92);
+      const mono = $('m-mono').checked, acc = $('m-acc').checked;
+      const tDown = Math.max(bt + d, now + 0.005);
+      const tUp = bt + d + s*T;
+      const [md, mu] = melodyBeat(beatIdx);
+      const pDown = mono ? 74 : md;
+      const pUp = mono ? 74 : mu;
+      horn(tDown, pDown, s*T*0.92, acc ? 0.16 : 0.2);
+      horn(tUp, pUp, (1-s)*T*0.92, acc ? 0.27 : 0.2);
+      noteIdx += 2; beatIdx++; nextBeat += T;
+    }
+  }
+  function start(){
+    if (!ctx) initAudio();
+    if (ctx.state === 'suspended') ctx.resume();
+    nextBeat = ctx.currentTime + 0.12 + Math.max(0, -P.delay/1000);
+    beatIdx = 0; noteIdx = 0; beatLog.length = 0; mel.cur = null; mel.dir = 1; bcur = 46;
+    timer = setInterval(tick, 25); tick();
+    playing = true; $('play').setAttribute('aria-pressed','true'); $('play').textContent = '■ 停止';
+    requestAnimationFrame(loop);
+  }
+  function stop(){
+    clearInterval(timer); playing = false;
+    $('play').setAttribute('aria-pressed','false'); $('play').textContent = '▶ 再生';
+    draw();
+  }
+  $('play').addEventListener('click', () => playing ? stop() : start());
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && !(e.target instanceof HTMLInputElement && e.target.type === 'number')) {
+      e.preventDefault(); playing ? stop() : start();
+    }
+  });
+
+  // ---- 描画 ----
+  const cv = $('cv'), g2 = cv.getContext('2d');
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  let head = null;
+  function draw(){
+    const dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (cv.width !== W*dpr || cv.height !== H*dpr) { cv.width = W*dpr; cv.height = H*dpr; }
+    g2.setTransform(dpr,0,0,dpr,0,0); g2.clearRect(0,0,W,H);
+    const T = 60000 / P.bpm, padL = 8, padR = 8, top = 22, bot = H - 26;
+    const span = 2*T, x0 = padL, x1 = W - padR;
+    const xOf = ms => x0 + (ms / span) * (x1 - x0);
+    const ink = css('--ink'), mute = css('--mute'), grid = css('--grid');
+    g2.font = '11px "DM Mono", ui-monospace, monospace'; g2.textBaseline = 'alphabetic';
+
+    // グリッド
+    for (let b = 0; b <= 2; b++) {
+      const x = xOf(b*T);
+      g2.strokeStyle = grid; g2.lineWidth = 2;
+      g2.beginPath(); g2.moveTo(x, top-6); g2.lineTo(x, bot); g2.stroke();
+      if (b < 2) {
+        g2.fillStyle = mute; g2.textAlign = b===0 ? 'left' : 'center';
+        g2.fillText(`beat ${b+1}`, b===0 ? x+4 : x, H-8);
+        const xh = xOf(b*T + T/2);
+        g2.globalAlpha = .45; g2.setLineDash([3,4]); g2.lineWidth = 1;
+        g2.beginPath(); g2.moveTo(xh, top); g2.lineTo(xh, bot); g2.stroke();
+        g2.setLineDash([]); g2.globalAlpha = 1;
+      }
+    }
+    // 音符（2拍分＋はみ出し分）
+    const s = P.dist/100;
+    const laneY = (top + bot)/2 - 10, h = 26;
+    for (let b = -1; b <= 2; b++) {
+      const tD = b*T + P.delay, tU = tD + s*T;
+      [[tD, s*T, css('--down'), '表'], [tU, (1-s)*T, css('--up'), '裏']].forEach(([t0, len, col, lab]) => {
+        const a = Math.max(t0, 0), z = Math.min(t0 + len*0.92, span);
+        if (z <= 0 || a >= span) return;
+        g2.fillStyle = col; g2.globalAlpha = .22;
+        g2.fillRect(xOf(a), laneY, xOf(z)-xOf(a), h);
+        g2.globalAlpha = 1;
+        if (t0 >= 0 && t0 <= span) {
+          g2.fillRect(xOf(t0)-1.5, laneY-8, 3, h+16);
+          g2.fillStyle = col; g2.textAlign = 'left';
+          g2.fillText(lab, xOf(t0)+5, laneY-2);
+        }
+      });
+    }
+    // 遅れの寸法線（beat1）
+    if (Math.abs(P.delay) >= 1) {
+      const y = bot - 8, xa = xOf(0), xb = xOf(P.delay);
+      if (xb >= x0) {
+        g2.strokeStyle = css('--brass'); g2.lineWidth = 1.5;
+        g2.beginPath(); g2.moveTo(xa, y); g2.lineTo(xb, y); g2.stroke();
+        g2.fillStyle = css('--brass'); g2.textAlign = 'left';
+        g2.fillText(`${P.delay>0?'+':''}${Math.round(P.delay)}ms`, Math.max(xa, xb)+4, y+4);
+      }
+    }
+    // 再生ヘッド＋いまのコード
+    if (head !== null && curChord) {
+      g2.fillStyle = ink; g2.textAlign = 'right';
+      g2.font = '500 15px "DM Mono", ui-monospace, monospace';
+      g2.fillText(curChord, x1, 14);
+    }
+    if (head !== null) {
+      g2.strokeStyle = ink; g2.globalAlpha = .7; g2.lineWidth = 1.5;
+      const x = xOf(head);
+      g2.beginPath(); g2.moveTo(x, top-10); g2.lineTo(x, bot+4); g2.stroke(); g2.globalAlpha = 1;
+    }
+  }
+  function loop(){
+    if (!playing) { head = null; draw(); return; }
+    const now = ctx.currentTime; let cur = null;
+    for (const e of beatLog) if (e[0] <= now) cur = e;
+    if (cur) { head = ((cur[1] % 2) * (60/P.bpm) + (now - cur[0])) * 1000; curChord = cur[2]; } else head = null;
+    draw(); requestAnimationFrame(loop);
+  }
+  window.addEventListener('resize', draw);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
+  new MutationObserver(draw).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+  document.fonts?.ready.then(draw);
+  sync();
+})();
+</script>
