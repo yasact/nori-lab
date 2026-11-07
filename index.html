@@ -528,6 +528,7 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   const onDial = (f, r, g) => [g.cx + r*Math.sin(2*Math.PI*f), g.cy - r*Math.cos(2*Math.PI*f)];
   function drawDial(){
     const dpr = window.devicePixelRatio || 1, g = dialGeom(), { W, H, cx, cy, R } = g;
+    if (R <= 0) return; // 非表示・未レイアウト（幅 0）だと arc が例外を投げ、draw() の呼び元（再生ループ）まで止まる
     // 非整数の dpr で毎フレーム確保し直さないよう丸めて比べる
     const bw = Math.round(W*dpr), bh = Math.round(H*dpr);
     if (dial.width !== bw || dial.height !== bh) { dial.width = bw; dial.height = bh; }
@@ -566,6 +567,60 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
       ray((head % T) / T, 0, R); g3.globalAlpha = 1;
     }
   }
+
+  // ---- 円のドラッグ: つかんだ位置からの回転量（拍）で動かす。範囲はスライダーと同じ ----
+  const frac = (x, y, g) => { const f = Math.atan2(x - g.cx, -(y - g.cy)) / (2*Math.PI); return f < 0 ? f + 1 : f; };
+  const unwrap = (a, ref) => a + Math.round(ref - a);
+  const snap = (x, step) => +(Math.round(x / step) * step).toFixed(3);
+  const clampTo = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+  const segDist = (x, y, ax, ay, bx, by) => {
+    const dx = bx - ax, dy = by - ay, t = clampTo(((x - ax)*dx + (y - ay)*dy) / (dx*dx + dy*dy), 0, 1);
+    return Math.hypot(x - ax - t*dx, y - ay - t*dy);
+  };
+  // s は範囲内に収めた開始値、acc は累積回転量（拍）。表拍は裏拍値を保ち、裏拍はハネ値だけ、針は遅れ値だけ
+  function dialValue(mode, s, acc){
+    if (mode === 'up') return { lag: s.lag, dist: clampTo(snap(s.dist + acc*100, 0.5), 40, 80) };
+    if (mode === 'needle') return { lag: clampTo(snap(s.lag + acc, 0.005), -0.15, 0.3), dist: s.dist };
+    const ura = s.lag + s.dist/100;
+    // 範囲で止めてから丸める（端の ura-0.8 などに浮動小数の端数が残らないように）
+    const lag = snap(clampTo(s.lag + acc, Math.max(-0.15, ura - 0.8), Math.min(0.3, ura - 0.4)), 0.005);
+    return { lag, dist: clampTo(snap((ura - lag)*100, 0.5), 40, 80) };
+  }
+  {
+    const eq = (v, lag, dist) => v.lag === lag && v.dist === dist;
+    console.assert(eq(dialValue('down', {lag:0.02, dist:60}, -0.05), -0.03, 65), 'dial: down across 12 o\'clock');
+    console.assert(eq(dialValue('up', {lag:0.075, dist:60}, 0.9), 0.075, 80), 'dial: up overshoot pins at 80');
+    console.assert(eq(dialValue('down', {lag:0.075, dist:60}, -0.3), -0.125, 80), 'dial: down hits dist limit');
+    console.assert(eq(dialValue('down', {lag:0.075, dist:60}, 1.2), 0.275, 40), 'dial: down hits dist 40');
+    console.assert(eq(dialValue('needle', {lag:0.075, dist:60}, 0.1), 0.175, 60), 'dial: needle keeps dist');
+    console.assert(eq(dialValue('needle', {lag:0.075, dist:60}, -0.7), -0.15, 60), 'dial: needle pins at -0.15');
+    console.assert(Math.abs(unwrap(0.02, 0.98) - 1.02) < 1e-9 && Math.abs(unwrap(0.97, 0.01) + 0.03) < 1e-9, 'dial: unwrap');
+  }
+  let drag = null;
+  const ptr = e => { const r = dial.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  dial.addEventListener('pointerdown', e => {
+    if (drag) return; // 2本目の指は無視
+    const g = dialGeom(), [x, y] = ptr(e), fs = { down:P.lag, up:P.lag + P.dist/100 };
+    let mode = null, best = 22;
+    for (const k in fs) { const [px, py] = onDial(fs[k], g.R, g), d = Math.hypot(x - px, y - py); if (d <= best) { best = d; mode = k; } }
+    if (!mode && Math.hypot(x - g.cx, y - g.cy) >= 0.3*g.R
+        && Object.values(fs).some(f => segDist(x, y, g.cx, g.cy, ...onDial(f, g.R, g)) <= 22)) mode = 'needle';
+    if (!mode) return;
+    e.preventDefault();
+    try { dial.setPointerCapture(e.pointerId); } catch {}
+    const a0 = frac(x, y, g);
+    drag = { id:e.pointerId, mode, s:{ lag:clampTo(P.lag, -0.15, 0.3), dist:clampTo(P.dist, 40, 80) }, a0, prev:a0 };
+  });
+  dial.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const g = dialGeom(), [x, y] = ptr(e);
+    if (Math.hypot(x - g.cx, y - g.cy) < 12) return; // 中心付近は角度が暴れる
+    const a = unwrap(frac(x, y, g), drag.prev); drag.prev = a;
+    const v = dialValue(drag.mode, drag.s, a - drag.a0);
+    if (v.lag === P.lag && v.dist === P.dist) return; // 値が変わらない操作ではプリセット選択を残す
+    P.lag = v.lag; P.dist = v.dist; sync(); $('preset').value = ''; refresh();
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => dial.addEventListener(t, e => { if (drag && e.pointerId === drag.id) drag = null; }));
   function loop(){
     if (!playing) { head = null; draw(); return; }
     const now = ctx.currentTime; let cur = null;
