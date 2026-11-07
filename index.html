@@ -142,6 +142,8 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
         <label><input type="checkbox" id="m-bass" checked>ベース（4分）</label>
         <label><input type="checkbox" id="m-acc">裏拍アクセント</label>
         <label><input type="checkbox" id="m-mono">単音にする</label>
+        <label><input type="checkbox" id="m-t8" checked>円に8分の目盛り</label>
+        <label><input type="checkbox" id="m-t3" checked>円に3連の目盛り</label>
       </div>
     </div>
   </section>
@@ -536,11 +538,17 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     const grid = css('--grid'), mute = css('--mute');
     const fD = P.lag, fU = P.lag + P.dist/100, ang = f => 2*Math.PI*f - Math.PI/2;
     const ray = (f, r0, r1) => { g3.beginPath(); g3.moveTo(...onDial(f, r0, g)); g3.lineTo(...onDial(f, r1, g)); g3.stroke(); };
-    // 縁・拍頭・ストレートの裏
+    // 縁・拍頭
     g3.lineCap = 'butt'; g3.strokeStyle = grid; g3.lineWidth = 1.5;
     g3.beginPath(); g3.arc(cx, cy, R, 0, 2*Math.PI); g3.stroke();
     g3.lineWidth = 3; ray(0, R - 10, R + 6);
-    g3.globalAlpha = .45; g3.lineWidth = 1.5; g3.setLineDash([3,4]); ray(0.5, R - 10, R + 6); g3.setLineDash([]); g3.globalAlpha = 1;
+    // 目盛り（拍頭基準 = 裏拍値の位置）: 8分 = 1/2、3連 = 2/3。ラベルは縁の内側（外側は表/裏のラベルが通る）
+    g3.font = '10px "Zen Kaku Gothic New", sans-serif'; g3.textAlign = 'center'; g3.textBaseline = 'middle';
+    [['m-t8', 1/2, grid, [3,4], '8分'], ['m-t3', 2/3, css('--brass'), [], '3連']].forEach(([id, f, col, dash, lab]) => {
+      if (!$(id).checked) return;
+      g3.strokeStyle = g3.fillStyle = col; g3.globalAlpha = .6; g3.lineWidth = 1.5; g3.setLineDash(dash);
+      ray(f, R - 10, R + 6); g3.setLineDash([]); g3.fillText(lab, ...onDial(f, R - 20, g)); g3.globalAlpha = 1;
+    });
     // 表→裏 の弧（ハネ値）
     g3.strokeStyle = css('--down'); g3.globalAlpha = .22; g3.lineWidth = 8;
     g3.beginPath(); g3.arc(cx, cy, R, ang(fD), ang(fU)); g3.stroke(); g3.globalAlpha = 1;
@@ -621,6 +629,7 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     P.lag = v.lag; P.dist = v.dist; sync(); $('preset').value = ''; refresh();
   });
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => dial.addEventListener(t, e => { if (drag && e.pointerId === drag.id) drag = null; }));
+  ['m-t8', 'm-t3'].forEach(id => $(id).addEventListener('change', draw)); // 停止中も描き直す
   function loop(){
     if (!playing) { head = null; draw(); return; }
     const now = ctx.currentTime; let cur = null;
