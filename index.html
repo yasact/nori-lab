@@ -40,6 +40,8 @@ canvas{display:block;width:100%;height:170px}
 .readout small{display:block;font-size:.72rem;color:var(--mute);letter-spacing:.04em}
 .readout b{font-family:var(--f-num);font-weight:500;font-size:1.15rem;font-variant-numeric:tabular-nums}
 .controls{display:flex;flex-direction:column;gap:18px}
+.vol{display:flex;flex-direction:column;gap:18px}
+.vol h2{margin:0}
 .row{display:grid;grid-template-columns:9.5em 1fr 6.5em;align-items:center;gap:14px}
 .row label{font-weight:700;font-size:.95rem}
 .row label em{display:block;font-style:normal;font-weight:400;font-size:.72rem;color:var(--mute)}
@@ -144,6 +146,30 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
         <label><input type="checkbox" id="m-mono">単音にする</label>
         <label><input type="checkbox" id="m-t8" checked>円に8分の目盛り</label>
         <label><input type="checkbox" id="m-t3" checked>円に3連の目盛り</label>
+      </div>
+    </div>
+
+    <div class="vol" role="group" aria-labelledby="vol-h">
+      <h2 id="vol-h">音量</h2>
+      <div class="row">
+        <label for="vol-all">全体<em>0 で無音</em></label>
+        <input type="range" id="vol-all-r" min="0" max="100" step="1" value="100" aria-label="音量（全体）">
+        <div class="num"><input type="number" id="vol-all" min="0" max="100" step="1" value="100"><span>%</span></div>
+      </div>
+      <div class="row">
+        <label for="vol-horn">ホーン</label>
+        <input type="range" id="vol-horn-r" min="0" max="150" step="1" value="100" aria-label="音量（ホーン）">
+        <div class="num"><input type="number" id="vol-horn" min="0" max="150" step="1" value="100"><span>%</span></div>
+      </div>
+      <div class="row">
+        <label for="vol-bass">ベース</label>
+        <input type="range" id="vol-bass-r" min="0" max="150" step="1" value="100" aria-label="音量（ベース）">
+        <div class="num"><input type="number" id="vol-bass" min="0" max="150" step="1" value="100"><span>%</span></div>
+      </div>
+      <div class="row">
+        <label for="vol-drums">ドラム<em>ライド＋ハイハット</em></label>
+        <input type="range" id="vol-drums-r" min="0" max="150" step="1" value="100" aria-label="音量（ドラム）">
+        <div class="num"><input type="number" id="vol-drums" min="0" max="150" step="1" value="100"><span>%</span></div>
       </div>
     </div>
   </section>
@@ -268,17 +294,21 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   }
 
   // ---- 音 ----
-  let ctx = null, master, noiseBuf;
+  let ctx = null, master, hornBus, bassBus, drumBus, out, noiseBuf;
   function initAudio(){
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain(); master.gain.value = 0.8;
     const comp = ctx.createDynamicsCompressor();
-    master.connect(comp).connect(ctx.destination);
+    // パート別の音量はコンプの前（既定値で今の音を保つ）、全体はコンプの後（比例して効く）
+    [hornBus, bassBus, drumBus] = [0, 0, 0].map(() => { const g = ctx.createGain(); g.connect(master); return g; });
+    out = ctx.createGain();
+    master.connect(comp).connect(out).connect(ctx.destination);
+    VOL.forEach(k => { volParam(k).value = gainOf(k); });
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
     // ライド右・ハット左に振って、同じ高域でも聞き分けられるようにする
-    const pan = v => { const p = ctx.createStereoPanner(); p.pan.value = v; p.connect(master); return p; };
+    const pan = v => { const p = ctx.createStereoPanner(); p.pan.value = v; p.connect(drumBus); return p; };
     ridePan = pan(0.35); hatPan = pan(-0.35);
     // ライド: 808式の非整数比 square 6本を鳴らしっぱなしにして、VCA だけ叩くたびに開く
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000;
@@ -289,7 +319,7 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     });
   }
   let ridePan, hatPan, rideVca;
-  function noiseHit(t, freq, dur, vol, dest = master, type = 'highpass'){
+  function noiseHit(t, freq, dur, vol, dest, type = 'highpass'){
     const s = ctx.createBufferSource(); s.buffer = noiseBuf;
     const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
     const g = ctx.createGain();
@@ -312,7 +342,7 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.42, t+0.008);
     g.gain.exponentialRampToValueAtTime(0.12, t+0.12); g.gain.exponentialRampToValueAtTime(0.001, t+len);
-    o.connect(g); o2.connect(g); g.connect(master);
+    o.connect(g); o2.connect(g); g.connect(bassBus);
     o.start(t); o2.start(t); o.stop(t+len+0.02); o2.stop(t+len+0.02);
   }
   function horn(t, midi, len, vol){
@@ -325,7 +355,7 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     const g = ctx.createGain(); const m = ctx.createGain(); m.gain.value = 0.5;
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t+0.012);
     g.gain.setValueAtTime(vol*0.8, t+Math.max(0.02,len*0.6)); g.gain.linearRampToValueAtTime(0, t+len);
-    o1.connect(lp); o2.connect(m).connect(lp); lp.connect(g).connect(master);
+    o1.connect(lp); o2.connect(m).connect(lp); lp.connect(g).connect(hornBus);
     o1.start(t); o2.start(t); o1.stop(t+len+0.02); o2.stop(t+len+0.02);
   }
 
@@ -638,6 +668,25 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     if (cur) { head = ((cur[1] % 2) * (60/P.bpm) + (now - cur[0])) * 1000; curChord = cur[2]; } else head = null;
     draw(); requestAnimationFrame(loop);
   }
+  // ---- 音量: 範囲と既定値は markup の range が正。表示 % はつまみ位置で、gain = (位置/100)^2 ----
+  const VOL = ['all', 'horn', 'bass', 'drums'];
+  const rng = k => $('vol-' + k + '-r');
+  const lim = k => [Number(rng(k).min), Number(rng(k).max)];
+  const V = Object.fromEntries(VOL.map(k => [k, Number(rng(k).defaultValue)]));
+  const writeVol = k => { rng(k).value = V[k]; $('vol-' + k).value = V[k]; };
+  const gainOf = k => (V[k] / 100) ** 2;
+  const volParam = k => ({ all: out, horn: hornBus, bass: bassBus, drums: drumBus })[k].gain;
+  const applyVol = k => { if (ctx) volParam(k).setTargetAtTime(gainOf(k), ctx.currentTime, 0.015); };
+  VOL.forEach(k => {
+    writeVol(k); // Firefox はリロード時にフォームの値を復元するので、実際の gain と表示を揃える
+    const set = e => {
+      const v = e.target.valueAsNumber;
+      if (!isFinite(v)) { writeVol(k); return; } // 空欄・非数を 0（無音）にしない
+      V[k] = clampTo(Math.round(v), ...lim(k)); writeVol(k); applyVol(k);
+    };
+    rng(k).addEventListener('input', set);
+    $('vol-' + k).addEventListener('change', set);
+  });
   window.addEventListener('resize', draw);
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
   new MutationObserver(draw).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
