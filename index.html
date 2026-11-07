@@ -28,6 +28,9 @@ h1 span{color:var(--brass)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
 .scope{position:relative}
 canvas{display:block;width:100%;height:170px}
+.views{display:flex;gap:16px;align-items:center}
+#dial{flex:none;width:220px;height:220px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#cv{flex:1 1 0;min-width:0}
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;color:var(--mute);margin-top:10px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .custom{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
@@ -70,6 +73,9 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   .row label{grid-column:1/-1}
   .readout{grid-template-columns:repeat(3,minmax(0,1fr))}
   h1{font-size:1.5rem}
+  .views{flex-direction:column;align-items:stretch}
+  #dial{align-self:center}
+  #cv{flex:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -81,7 +87,10 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   </header>
 
   <section class="panel scope">
-    <canvas id="cv" aria-label="2拍分のタイミング表示"></canvas>
+    <div class="views">
+      <canvas id="dial" role="img" aria-label="円のタイミング表示（1周＝1拍。丸と針をドラッグで調整）"></canvas>
+      <canvas id="cv" aria-label="2拍分のタイミング表示"></canvas>
+    </div>
     <div class="legend">
       <span><i style="background:var(--grid)"></i>ビート（リズム隊のグリッド）</span>
       <span><i style="background:var(--down)"></i>表拍の8分</span>
@@ -443,6 +452,7 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 
   // ---- 描画 ----
   const cv = $('cv'), g2 = cv.getContext('2d');
+  const dial = $('dial'), g3 = dial.getContext('2d');
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   let head = null;
   function draw(){
@@ -508,6 +518,52 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
       g2.strokeStyle = ink; g2.globalAlpha = .7; g2.lineWidth = 1.5;
       const x = xOf(head);
       g2.beginPath(); g2.moveTo(x, top-10); g2.lineTo(x, bot+4); g2.stroke(); g2.globalAlpha = 1;
+    }
+    drawDial();
+  }
+
+  // ---- 円の表示: 1周=1拍、12時=拍頭、時計回り。f は拍の割合 ----
+  // 描画と当たり判定で同じ寸法を使う
+  const dialGeom = () => { const W = dial.clientWidth, H = dial.clientHeight; return { W, H, cx:W/2, cy:H/2, R:Math.min(W, H)/2 - 26 }; };
+  const onDial = (f, r, g) => [g.cx + r*Math.sin(2*Math.PI*f), g.cy - r*Math.cos(2*Math.PI*f)];
+  function drawDial(){
+    const dpr = window.devicePixelRatio || 1, g = dialGeom(), { W, H, cx, cy, R } = g;
+    // 非整数の dpr で毎フレーム確保し直さないよう丸めて比べる
+    const bw = Math.round(W*dpr), bh = Math.round(H*dpr);
+    if (dial.width !== bw || dial.height !== bh) { dial.width = bw; dial.height = bh; }
+    g3.setTransform(dpr,0,0,dpr,0,0); g3.clearRect(0,0,W,H);
+    const grid = css('--grid'), mute = css('--mute');
+    const fD = P.lag, fU = P.lag + P.dist/100, ang = f => 2*Math.PI*f - Math.PI/2;
+    const ray = (f, r0, r1) => { g3.beginPath(); g3.moveTo(...onDial(f, r0, g)); g3.lineTo(...onDial(f, r1, g)); g3.stroke(); };
+    // 縁・拍頭・ストレートの裏
+    g3.lineCap = 'butt'; g3.strokeStyle = grid; g3.lineWidth = 1.5;
+    g3.beginPath(); g3.arc(cx, cy, R, 0, 2*Math.PI); g3.stroke();
+    g3.lineWidth = 3; ray(0, R - 10, R + 6);
+    g3.globalAlpha = .45; g3.lineWidth = 1.5; g3.setLineDash([3,4]); ray(0.5, R - 10, R + 6); g3.setLineDash([]); g3.globalAlpha = 1;
+    // 表→裏 の弧（ハネ値）
+    g3.strokeStyle = css('--down'); g3.globalAlpha = .22; g3.lineWidth = 8;
+    g3.beginPath(); g3.arc(cx, cy, R, ang(fD), ang(fU)); g3.stroke(); g3.globalAlpha = 1;
+    // 針
+    g3.strokeStyle = mute; g3.lineWidth = 3; g3.lineCap = 'round';
+    ray(fD, 0, R); ray(fU, 0, R);
+    g3.fillStyle = mute; g3.beginPath(); g3.arc(cx, cy, 5, 0, 2*Math.PI); g3.fill();
+    // 拍頭ラベルは針の後に下地つきで描く（lag 0 で針が文字に重なるため）
+    g3.font = '11px "Zen Kaku Gothic New", sans-serif'; g3.textAlign = 'center'; g3.textBaseline = 'top';
+    const lw = g3.measureText('拍頭').width + 4;
+    g3.fillStyle = css('--panel'); g3.fillRect(cx - lw/2, cy - R + 13, lw, 14);
+    g3.fillStyle = mute; g3.fillText('拍頭', cx, cy - R + 14);
+    // 丸とラベル（ラベルは縁の外）
+    g3.font = '700 13px "Zen Kaku Gothic New", sans-serif'; g3.textBaseline = 'middle';
+    [[fD, css('--down'), '表'], [fU, css('--up'), '裏']].forEach(([f, col, lab]) => {
+      g3.fillStyle = col;
+      g3.beginPath(); g3.arc(...onDial(f, R, g), 9, 0, 2*Math.PI); g3.fill();
+      g3.fillText(lab, ...onDial(f, R + 17, g));
+    });
+    // 再生ヘッド
+    if (head !== null) {
+      const T = 60000 / P.bpm;
+      g3.strokeStyle = css('--ink'); g3.globalAlpha = .7; g3.lineWidth = 1.5; g3.lineCap = 'butt';
+      ray((head % T) / T, 0, R); g3.globalAlpha = 1;
     }
   }
   function loop(){
