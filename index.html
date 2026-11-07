@@ -542,12 +542,13 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
     g3.lineCap = 'butt'; g3.strokeStyle = grid; g3.lineWidth = 1.5;
     g3.beginPath(); g3.arc(cx, cy, R, 0, 2*Math.PI); g3.stroke();
     g3.lineWidth = 3; ray(0, R - 10, R + 6);
-    // 目盛り（拍頭基準 = 裏拍値の位置）: 8分 = 1/2、3連 = 2/3。ラベルは縁の内側（外側は表/裏のラベルが通る）
+    // 目盛り（拍頭基準 = 裏拍値の位置）: 8分 = 1/2、3連 = 1/3・2/3。ラベルは縁の内側（外側は表/裏のラベルが通る）
     g3.font = '10px "Zen Kaku Gothic New", sans-serif'; g3.textAlign = 'center'; g3.textBaseline = 'middle';
-    [['m-t8', 1/2, grid, [3,4], '8分'], ['m-t3', 2/3, css('--brass'), [], '3連']].forEach(([id, f, col, dash, lab]) => {
+    [['m-t8', [1/2], grid, [3,4], '8分'], ['m-t3', [1/3, 2/3], css('--brass'), [], '3連']].forEach(([id, fs, col, dash, lab]) => {
       if (!$(id).checked) return;
-      g3.strokeStyle = g3.fillStyle = col; g3.globalAlpha = .6; g3.lineWidth = 1.5; g3.setLineDash(dash);
-      ray(f, R - 10, R + 6); g3.setLineDash([]); g3.fillText(lab, ...onDial(f, R - 20, g)); g3.globalAlpha = 1;
+      g3.strokeStyle = g3.fillStyle = col; g3.globalAlpha = .6; g3.lineWidth = 1.5;
+      fs.forEach(f => { g3.setLineDash(dash); ray(f, R - 10, R + 6); g3.setLineDash([]); g3.fillText(lab, ...onDial(f, R - 20, g)); });
+      g3.globalAlpha = 1;
     });
     // 表→裏 の弧（ハネ値）
     g3.strokeStyle = css('--down'); g3.globalAlpha = .22; g3.lineWidth = 8;
