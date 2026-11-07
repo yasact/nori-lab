@@ -672,7 +672,28 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   const VOL = ['all', 'horn', 'bass', 'drums'];
   const rng = k => $('vol-' + k + '-r');
   const lim = k => [Number(rng(k).min), Number(rng(k).max)];
-  const V = Object.fromEntries(VOL.map(k => [k, Number(rng(k).defaultValue)]));
+  const VKEY = 'nori-lab-volume';
+  const volDefault = k => Number(rng(k).defaultValue);
+  // 保存値の検証。Number(null) や Number('') は 0（無音）になるので typeof で弾く。全体 0 だけは復元しない（無音で始まると壊れて見える）
+  const volFrom = o => Object.fromEntries(VOL.map(k => {
+    const v = o && typeof o === 'object' ? o[k] : undefined;
+    if (typeof v !== 'number' || !isFinite(v)) return [k, volDefault(k)];
+    const r = clampTo(Math.round(v), ...lim(k));
+    return [k, k === 'all' && r === 0 ? volDefault(k) : r];
+  }));
+  {
+    const eq = (o, want) => { const v = volFrom(o); return VOL.every(k => v[k] === (want[k] ?? 100)); };
+    console.assert(eq({all:'x'}, {}), 'vol: string');
+    console.assert(eq({all:null}, {}), 'vol: null');
+    console.assert(eq({all:999, bass:999}, {bass:150}), 'vol: clamp max');
+    console.assert(eq({horn:-5}, {horn:0}), 'vol: clamp min');
+    console.assert(eq({drums:40.7}, {drums:41}), 'vol: round');
+    console.assert(eq({all:0, bass:0}, {bass:0}), 'vol: all 0 not restored');
+    console.assert(eq(null, {}) && eq(5, {}), 'vol: non-object');
+  }
+  const loadVol = () => { try { return volFrom(JSON.parse(localStorage.getItem(VKEY))); } catch { return volFrom(null); } };
+  const saveVol = () => { try { localStorage.setItem(VKEY, JSON.stringify(V)); } catch {} };
+  const V = loadVol();
   const writeVol = k => { rng(k).value = V[k]; $('vol-' + k).value = V[k]; };
   const gainOf = k => (V[k] / 100) ** 2;
   const volParam = k => ({ all: out, horn: hornBus, bass: bassBus, drums: drumBus })[k].gain;
@@ -685,7 +706,8 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
       V[k] = clampTo(Math.round(v), ...lim(k)); writeVol(k); applyVol(k);
     };
     rng(k).addEventListener('input', set);
-    $('vol-' + k).addEventListener('change', set);
+    $('vol-' + k).addEventListener('change', e => { set(e); saveVol(); });
+    rng(k).addEventListener('change', saveVol); // ドラッグ中は毎回書かず、離したときだけ保存
   });
   window.addEventListener('resize', draw);
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
