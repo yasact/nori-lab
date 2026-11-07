@@ -14,6 +14,8 @@
 
 ## 構成
 - 音: Web Audio のシンセ（ホーン=saw+square→LPF、ベース=tri+sine、ライド=808式 square 6本→HPF→VCA＋スティック音（右）、ハイハット=ノイズ+BPF（左））
+  - グラフ: 各声部 → `hornBus` / `bassBus` / `drumBus`（ライド・ハットの panner）→ `master`(0.8) → DynamicsCompressor → `out` → destination。新しい声部は必ずどれかの bus につなぐ（`master` に直結しない。`noiseHit` の `dest` は必須）
+- 音量: 再生ボタンの下の「音量」に 4 本（全体 0–100 % が `out`、ホーン/ベース/ドラム 0–150 % が各 bus）。gain = (位置/100)^2 で、表示 % はつまみ位置（gain ではない）。`setTargetAtTime(…, 0.015)` で動かしたものだけ反映。範囲・既定値は markup の range の `min`/`max`/`value` が正で JS はそこから読む。localStorage `nori-lab-volume`（{all, horn, bass, drums}、range の `change` と数値の `change` で保存。全体 0 は復元せず 100）。パートはコンプの前なので少し影響しあう（ベース 0 で他が約 +2 dB）
 - スケジューラ: 25ms 間隔の lookahead（0.15s）。拍ごとに リズム隊（グリッド通り）→ 表拍 bt+delay → 裏拍 bt+delay+hane*T
 - メロディ生成 `melodyBeat(i)`: 拍頭=次コードのコードトーン、裏拍=スケール経過音 or 半音アプローチ/越えて戻る。音域 58–82
 - ベース `bassBeat(i)`: コード頭=ルート、コード末=次ルートへの半音アプローチ、他=コードトーン
