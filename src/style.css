@@ -78,7 +78,9 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 #pdel{flex:none;min-height:44px}
 #pinfo{margin:8px 0 0;font-size:.75rem;color:var(--mute)}
 .v{font-family:var(--f-num);font-size:.9em;color:var(--mute)}
-#psave{min-height:44px}
+#psave,#pshare{min-height:44px}
+#pmsg{margin-top:6px;overflow-wrap:anywhere}
+#pmsg:empty{display:none}
 .adv summary{cursor:pointer;font-size:.9rem;color:var(--mute);padding:12px 0}
 .adv .row{margin-top:8px}
 .note{font-size:.82rem;color:var(--mute);max-width:65ch;margin:0}
@@ -87,7 +89,17 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 .about .note{max-width:none}
 .about p{margin:0 0 10px}
 .about a{color:var(--brass)}
+.foot{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;font-size:.8rem;color:var(--mute)}
+.foot span{margin-right:6px;font-family:var(--f-num)}
+.foot a{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;color:var(--mute)}
+.foot a:hover{color:var(--brass)}
+.foot a:focus-visible{outline:2px solid var(--brass);outline-offset:-4px}
+.foot svg{width:22px;height:22px;fill:currentColor}
+.foot svg[fill="none"]{fill:none}
 @media (max-width:560px){
+  /* スマホは再生ボタンを右下に浮かせる（最初の画面に入らず、スライダーをいじりながらも押せるように）。下端に隠れないぶん body に余白 */
+  #play{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:10;min-height:56px;box-shadow:0 4px 16px rgb(0 0 0/.35)}
+  body{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
   .mix{flex-direction:column;gap:14px}
   .ch{max-width:none;grid-template-columns:6.5em 1fr 5.5em;grid-template-areas:"nm r n" "ms r n";justify-items:stretch;align-items:center;gap:4px 10px;padding:0;border:0}
   .ch.master{border-top:1px solid var(--line);border-radius:0;background:none;padding-top:12px}

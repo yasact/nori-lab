@@ -57,10 +57,52 @@ const saveMine = (a: Mine[]) => { try { localStorage.setItem(KEY, JSON.stringify
 const el = (tag: string, cls?: string | null, text?: string | null) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const opt = (v: string, text: string) => { const o = el('option', null, text) as HTMLOptionElement; o.value = v; return o; };
 const grp = (label: string, opts: HTMLOptionElement[]) => { const g = el('optgroup') as HTMLOptGroupElement; g.label = label; g.append(...opts); return g; };
-// 選択は #preset の value だけで持つ: '' =（自分で調整中）/ 'p'+i プレイヤー / 'b'+i 基本 / 'm'+i 保存したノリ
+// ---- URL で共有（#21）: ?n=名前&bpm=&lag=&hane=&yd=&yu=&bl= ----
+type Shared = { name?: string; bpm?: number; lag?: number; dist?: number; yureD?: number; yureU?: number; bassLag?: number };
+// [クエリのキー, 範囲を借りる数値欄の id, Shared のキー]。範囲は入力欄の min / max と同じ
+const SHARE_KEYS: [string, string, Exclude<keyof Shared, 'name'>][] = [['bpm','bpm','bpm'], ['lag','lag','lag'], ['hane','dist','dist'], ['yd','yd','yureD'], ['yu','yu','yureU'], ['bl','bl','bassLag']];
+const NAME_MAX = 40;
+// URL は誰でも書き換えられるので信用しない: 数でないもの・空は無視、範囲外は clamp、名前は長さを切る（表示は textContent だけ）
+function fromQuery(q: URLSearchParams): Shared | null {
+  const v: Shared = {};
+  for (const [k, id, f] of SHARE_KEYS) {
+    const s = q.get(k), x = Number(s);
+    if (s === null || s.trim() === '' || !isFinite(x)) continue;
+    v[f] = Math.min(Number($(id).max), Math.max(Number($(id).min), x));
+  }
+  const n = q.get('n')?.trim().slice(0, NAME_MAX);
+  if (n) v.name = n;
+  return Object.keys(v).length ? v : null;
+}
+// 0 のゆらぎ・ベース位置は付けない（URL を短く）
+function toQuery(v: Required<Omit<Shared, 'name'>> & { name: string }){
+  const q = new URLSearchParams();
+  if (v.name) q.set('n', v.name.slice(0, NAME_MAX));
+  q.set('bpm', String(v.bpm)); q.set('lag', String(+v.lag.toFixed(4))); q.set('hane', String(v.dist));
+  if (v.yureD) q.set('yd', String(v.yureD));
+  if (v.yureU) q.set('yu', String(v.yureU));
+  if (v.bassLag) q.set('bl', String(+v.bassLag.toFixed(4)));
+  return q.toString();
+}
+{
+  const same = (a: object | null, b: object) => !!a && JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+  console.assert(fromQuery(new URLSearchParams('')) === null && fromQuery(new URLSearchParams('zz=1&n=%20')) === null, 'share: 値がなければ null');
+  console.assert(same(fromQuery(new URLSearchParams('bpm=999&lag=abc&hane=&yd=-5&n=<b>x</b>')), { bpm:400, yureD:0, name:'<b>x</b>' }), 'share: clamp と無視');
+  console.assert(fromQuery(new URLSearchParams('n=' + 'あ'.repeat(99)))!.name!.length === NAME_MAX, 'share: 名前の長さ');
+  const v = { name:'自分のノリ & co', bpm:190, lag:0.1234, dist:62.5, yureD:30, yureU:0, bassLag:-0.05 };
+  const { yureU, ...back } = v; // 0 は URL に載らない
+  console.assert(same(fromQuery(new URLSearchParams(toQuery(v))), back), 'share: 往復');
+}
+// URL で開いたノリ。あればプリセット欄に「共有されたノリ」として出す
+const shared = fromQuery(new URLSearchParams(location.search));
+// SD は平均（URL には入れない）。ゆらぎ・ベース位置は 0 のとき URL に載らないので、書かれていなければ既定値。ほかは今のまま
+function applyShared(s: Shared){ const { name, ...vals } = s; Object.assign(P, { yureD:YURE_DEFAULT, yureU:YURE_DEFAULT, bassLag:0 }, vals, { sdLag:SD_AVG[0], sdUra:SD_AVG[1] }); sync(); }
+
+// 選択は #preset の value だけで持つ: '' =（自分で調整中）/ 's' 共有されたノリ / 'p'+i プレイヤー / 'b'+i 基本 / 'm'+i 保存したノリ
 function renderOptions(v: string){
   const mine = loadMine();
   $('preset').replaceChildren(opt('', '（自分で調整中）'),
+    ...(shared ? [opt('s', `共有されたノリ${shared.name ? ': ' + shared.name : ''}`)] : []),
     grp('プレイヤー', PAPER.map((p, i) => opt('p' + i, `${p[0]} — ${p[1]} '${String(p[2]).slice(2)}`))),
     grp('基本', PRESETS.map((p, i) => opt('b' + i, p[0]))),
     ...(mine.length ? [grp('保存したノリ', mine.map((p, i) => opt('m' + i, p.name)))] : []));
@@ -76,6 +118,7 @@ function refresh(){
 }
 $('preset').addEventListener('change', e => {
   const v = (e.target as HTMLSelectElement).value, i = +v.slice(1), m = v[0] === 'm' && loadMine()[i];
+  if (v === 's' && shared) { applyShared(shared); refresh(); return; }
   const [lag, dist, bpm, sdLag = SD_AVG[0], sdUra = SD_AVG[1]] = (v[0] === 'p' ? PAPER[i].slice(3) : v[0] === 'b' ? PRESETS[i].slice(1) : m ? [m.lag, m.dist] : []) as number[];
   if (v) {
     P.lag = lag; P.dist = dist; if (bpm) P.bpm = bpm; P.sdLag = sdLag; P.sdUra = sdUra;
@@ -99,11 +142,28 @@ $('psave').addEventListener('click', () => {
   renderOptions(n === a.length ? 'm' + (n - 1) : $('preset').value); // 保存に失敗したら（容量・プライベートモード）選択は動かさない
   refresh();
 });
+$('pshare').addEventListener('click', async () => {
+  const sel = $<HTMLSelectElement>('preset'), v = sel.value;
+  // 名前: 入力欄 → 選んでいるプリセットの名前 → なし
+  const name = $('pname').value.trim() || (v === 's' ? shared?.name ?? '' : v ? sel.selectedOptions[0].textContent ?? '' : '');
+  const url = `${location.origin}${location.pathname}?${toQuery({ name, bpm:P.bpm, lag:P.lag, dist:P.dist, yureD:P.yureD, yureU:P.yureU, bassLag:P.bassLag })}`;
+  const msg = (t: string) => { $('pmsg').textContent = t; };
+  if (navigator.share) {
+    try { await navigator.share({ title: 'ノリ・ラボ', text: name || 'ノリ・ラボのノリ', url }); return; }
+    catch (e) { if ((e as Error).name === 'AbortError') return; } // 閉じただけなら何もしない。それ以外はコピーに回す
+  }
+  try { await navigator.clipboard.writeText(url); msg('リンクをコピーした'); }
+  catch { msg(url); } // コピーもできないときは URL をそのまま見せる
+});
 // on(...) より後に登録するので、P が更新されてから refresh が走る
 [['delay-r','input'],['delay','change'],['lag-r','input'],['lag','change'],['dist-r','input'],['dist','change']]
   .forEach(([id, ev]) => $(id).addEventListener(ev, () => { $('preset').value = ''; refresh(); }));
 [['bpm-r','input'],['bpm','change']].forEach(([id, ev]) => $(id).addEventListener(ev, refresh));
-renderOptions(''); refresh();
+// 起動時: URL で共有されたノリがあればそれ（名前は保存欄に入れておく）。なければパーカー — JATP Blues
+// （同じ録音・同じテンポ 190 でヤング・ホーキンスと聴き比べられる）。どちらも選んだときと同じ処理を通す
+renderOptions(shared ? 's' : 'p' + PAPER.findIndex(p => p[0] === 'チャーリー・パーカー' && p[1] === 'JATP Blues'));
+if (shared?.name) $('pname').value = shared.name;
+$('preset').dispatchEvent(new Event('change'));
 
 function update(){
   const T = 60000 / P.bpm, hane = P.dist / 100;
