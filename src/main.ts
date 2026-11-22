@@ -48,6 +48,8 @@ const PAPER: [string, string, number, number, number, number, number, number][] 
   ['コールマン・ホーキンス', 'JATP Blues', 1946, 0, 66, 190, 0.06, 0.06],
   ['バディ・リッチ（ドラム）', 'JATP Blues', 1946, 0, 72, 190, 0.02, 0.03],
 ];
+// JATP Blues（1946・♩190）の奏者の PAPER の行。円の下の 3 人のボタンと起動時のパーカーで使う
+const jatp = (name: string) => PAPER.findIndex(p => p[0] === name && p[1] === 'JATP Blues');
 const tameTag = (lag: number) => lag <= -0.02 ? '前ノリ' : lag < 0.04 ? 'ジャスト' : lag < 0.14 ? 'ちょい後ろ' : 'かなり後ろ';
 const haneTag = (dist: number) => dist < 54 ? 'まっすぐ' : dist < 62 ? '軽く跳ねる' : dist < 69 ? '3連くらい' : '強く跳ねる';
 type Mine = { name: string; lag: number; dist: number; yureD?: number; yureU?: number }; // yureD / yureU は #8 より前の保存にはない
@@ -112,7 +114,9 @@ function refresh(){
   // タグは表示する丸めた値から決める（0.1399 が「ちょい後ろ 0.14」にならないように）
   const l = +P.lag.toFixed(2), h = +(P.dist / 100).toFixed(2), v = $('preset').value;
   $('pinfo').replaceChildren(el('span', 'tag tame', tameTag(l)), ' ', el('small', 'v', l.toFixed(2)), ' · ',
-    el('span', 'tag hane', haneTag(h * 100)), ' ', el('small', 'v', h.toFixed(2)), ' · ', el('small', 'v', `${P.bpm}bpm`));
+    el('span', 'tag hane', haneTag(h * 100)), ' ', el('small', 'v', h.toFixed(2)));
+  // 円の下の 3 人: いま選んでいるプリセットの人だけ点灯
+  document.querySelectorAll<HTMLButtonElement>('.trio button').forEach(b => b.setAttribute('aria-pressed', String(v === 'p' + jatp(b.dataset.player!))));
   $('pdel').hidden = !v.startsWith('m');
   if (v.startsWith('m')) $('pdel').setAttribute('aria-label', `${loadMine()[+v.slice(1)].name} を削除`);
 }
@@ -129,6 +133,10 @@ $('preset').addEventListener('change', e => {
   }
   refresh();
 });
+// 円の下の 3 人 = 「誰風で吹く？」でその奏者を選んだのと同じ（鳴らし始めはしない）
+document.querySelectorAll<HTMLButtonElement>('.trio button').forEach(b => b.addEventListener('click', () => {
+  $('preset').value = 'p' + jatp(b.dataset.player!); $('preset').dispatchEvent(new Event('change'));
+}));
 $('pdel').addEventListener('click', e => {
   const a = loadMine(); a.splice(+$('preset').value.slice(1), 1); saveMine(a);
   renderOptions(''); refresh();
@@ -161,7 +169,7 @@ $('pshare').addEventListener('click', async () => {
 [['bpm-r','input'],['bpm','change']].forEach(([id, ev]) => $(id).addEventListener(ev, refresh));
 // 起動時: URL で共有されたノリがあればそれ（名前は保存欄に入れておく）。なければパーカー — JATP Blues
 // （同じ録音・同じテンポ 190 でヤング・ホーキンスと聴き比べられる）。どちらも選んだときと同じ処理を通す
-renderOptions(shared ? 's' : 'p' + PAPER.findIndex(p => p[0] === 'チャーリー・パーカー' && p[1] === 'JATP Blues'));
+renderOptions(shared ? 's' : 'p' + jatp('チャーリー・パーカー'));
 if (shared?.name) $('pname').value = shared.name;
 $('preset').dispatchEvent(new Event('change'));
 
@@ -178,7 +186,12 @@ function update(){
 buildProg($('prog').value); $('prog').addEventListener('change', () => buildProg($('prog').value));
 
 // ---- 再生 ----
+// 「▶ タップして聴く」は初回だけ。どの方法で鳴らしても、鳴らした時点で消して覚える
+const SEEN = 'nori-lab-seen';
+$('tapstart').hidden = (() => { try { return localStorage.getItem(SEEN) === '1'; } catch { return false; } })();
+$('tapstart').addEventListener('click', () => start());
 function start(){
+  $('tapstart').hidden = true; try { localStorage.setItem(SEEN, '1'); } catch {}
   if (!ctx) { initAudio(); VOL.forEach(k => { volParam(k).value = gainOf(k); }); }
   startScheduler();
   $('play').setAttribute('aria-pressed','true'); $('play').textContent = '■ 停止';
@@ -252,6 +265,7 @@ dial.addEventListener('pointermove', e => {
 });
 (['pointerup', 'pointercancel', 'lostpointercapture'] as const).forEach(t => dial.addEventListener(t, e => { if (drag && e.pointerId === drag.id) drag = null; }));
 ['m-t8', 'm-t3'].forEach(id => $(id).addEventListener('change', draw)); // 停止中も描き直す
+$('twobeat').addEventListener('toggle', draw); // 閉じている間は幅 0 なので、開いたら描き直す
 
 // ---- 音量: 範囲と既定値は markup の range が正。表示 % はつまみ位置で、gain = (位置/100)^2 ----
 const VOL = ['all', 'horn', 'bass', 'drums'] as const;
