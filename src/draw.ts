@@ -51,6 +51,16 @@ export function draw(){
       }
     });
   }
+  // ベースの位置（ずらしたときだけ。0 なら拍頭のグリッド線と重なる）
+  if (P.bassLag !== 0) {
+    g2.strokeStyle = g2.fillStyle = ink; g2.lineWidth = 3; g2.textAlign = 'left';
+    for (let b = -1; b <= 2; b++) {
+      const t = (b + P.bassLag)*T;
+      if (t < 0 || t > span) continue;
+      g2.beginPath(); g2.moveTo(xOf(t), top-10); g2.lineTo(xOf(t), top+6); g2.stroke();
+      if (b === 0 || (b === 1 && P.bassLag < 0)) g2.fillText('ベース', xOf(t)+4, top-1);
+    }
+  }
   // 遅れの寸法線（beat1）
   if (Math.abs(P.delay) >= 1) {
     const y = bot - 8, xa = xOf(0), xb = xOf(P.delay);

@@ -107,7 +107,7 @@ function tick(){
     if ($('m-ride').checked) ride(bt);
     if ($('m-hh').checked && beatIdx % 2 === 1) hihat(bt);
     const bn = bassBeat(beatIdx);
-    if ($('m-bass').checked) bass(bt, bn, T*0.92);
+    if ($('m-bass').checked) bass(bt + P.bassLag*T, bn, T*0.92); // ホーンは動かさない（グリッド基準）
     const mono = $('m-mono').checked, acc = $('m-acc').checked;
     // ゆらぎはホーンだけ。リズム隊はグリッドのまま
     const sdD = P.sdLag * P.yureD/100, sdU = P.sdUra * P.yureU/100, zN = gauss();
@@ -124,7 +124,7 @@ function tick(){
 // initAudio() の後に呼ぶ
 export function startScheduler(){
   if (ctx.state === 'suspended') ctx.resume();
-  nextBeat = ctx.currentTime + 0.12 + Math.max(0, -P.delay/1000);
+  nextBeat = ctx.currentTime + 0.12 + Math.max(0, -P.delay/1000, -P.bassLag*60/P.bpm);
   beatIdx = 0; noteIdx = 0; beatLog.length = 0; resetMusic(); zNext = gauss();
   timer = setInterval(tick, 25); tick();
   playing = true;

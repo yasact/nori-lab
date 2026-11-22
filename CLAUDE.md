@@ -10,8 +10,9 @@ Vite + TypeScript（framework なし、runtime 依存ゼロ、`strict: true`、�
 - **裏拍値** = 遅れ値 + ハネ値（グリッドから見た裏拍の位置。ストレートは 0.5）
 - 出典: 井上裕章「スウィングジャズからビバップへの変遷期における8分音符タイミングの変化」日本音楽知覚認知学会誌 23(1) https://doi.org/10.32199/jsmpc.23.1_3
 
-内部状態は `P = { bpm, lag(遅れ値), dist(ハネ値×100), yureD / yureU(ゆらぎ %), sdLag / sdUra(100% のときの SD、拍) }`。ms 表示は `P.delay` ゲッターで換算。
+内部状態は `P = { bpm, lag(遅れ値), dist(ハネ値×100), bassLag(ベースの位置), yureD / yureU(ゆらぎ %), sdLag / sdUra(100% のときの SD、拍) }`。ms 表示は `P.delay` ゲッターで換算。
 遅れ値で保持しているので、テンポを変えてもノリは保たれる。
+このアプリの遅れ値はライド（リズム隊のグリッド）基準。ベースの位置（`bassLag`）が 0 のときだけ論文のベース基準と一致する。
 
 ## 構成
 - ファイル（import は main → draw → audio → music の一方向。`state` はどこからでも読む）
@@ -23,6 +24,8 @@ Vite + TypeScript（framework なし、runtime 依存ゼロ、`strict: true`、�
   - `src/main.ts`: 入口。入力のひも付け・プリセット・円のドラッグ・音量・再生ボタン/Space。音量の gain は `start()` で `initAudio()` の直後に入れる
 - 音: Web Audio のシンセ（ホーン=saw+square→LPF、ベース=tri+sine、ライド=808式 square 6本→HPF→VCA＋スティック音（右）、ハイハット=ノイズ+BPF（左））
   - グラフ: 各声部 → `hornBus` / `bassBus` / `drumBus`（ライド・ハットの panner）→ `master`(0.8) → DynamicsCompressor → `out` → destination。新しい声部は必ずどれかの bus につなぐ（`master` に直結しない。`noiseHit` の `dest` は必須）
+- 詳細設定（`<details class="adv">`、既定で閉じている）: 表のゆらぎ・裏のゆらぎ・ベースの位置
+- ベースの位置（#13）: 「詳細設定」の中。`bassLag` = ライドのグリッドからのズレ ÷ 1拍（スライダー ±0.1、数値 ±0.2、ms を `#bl-ms` に表示）。ベースの発音だけを `bt + bassLag*T` にずらし、ホーン・ライド・ハットはグリッドのまま（ベースから見た遅れ値が変わる）。プリセットとは独立（選んでも変わらず、保存もしない。選択も外さない）。2拍表示では 0 以外のときだけ上端に印と「ベース」を描く（円には出さない）。再生開始の余白に前ノリ分を足している
 - 音量: 再生ボタンの下の「音量」に 4 本（全体 0–100 % が `out`、ホーン/ベース/ドラム 0–150 % が各 bus）。gain = (位置/100)^2 で、表示 % はつまみ位置（gain ではない）。`setTargetAtTime(…, 0.015)` で動かしたものだけ反映。範囲・既定値は markup の range の `min`/`max`/`value` が正で JS はそこから読む。localStorage `nori-lab-volume`（{all, horn, bass, drums}、range の `change` と数値の `change` で保存。全体 0 は復元せず 100）。パートはコンプの前なので少し影響しあう（ベース 0 で他が約 +2 dB）
 - スケジューラ: 25ms 間隔の lookahead（0.15s）。拍ごとに リズム隊（グリッド通り）→ 表拍 bt+delay → 裏拍 bt+delay+hane*T（ゆらぎ分ずらす）
 - ゆらぎ（#8）: ホーンの表拍・裏拍だけを 1 音ごとに正規分布（Box-Muller の `gauss()`）でずらす。リズム隊はグリッドのまま。SD（拍）は 表 = `sdLag`×表のゆらぎ%、裏 = `sdUra`×裏のゆらぎ%（裏は裏拍値のばらつき = 表とは独立に引く）。`sdLag` / `sdUra` は最後に選んだプリセットで決まり、プレイヤーはその行の値、基本・保存したノリ・起動時はソリスト 8 行の平均 `SD_AVG`。スライダーをいじっても変えない。時刻は `swing()` で計算し、裏は前後の表から 0.05 拍以上離す（表を追い越さないほうを優先）。次の拍の表のずれは 1 拍先に引いておく（`zNext`）。ホーンの長さは次の音までの間隔×0.92。0% で従来と同じ。ロード時の `console.assert` で SD と順序を確かめる。ゆらぎのスライダーはプリセットの選択を外さない。canvas は平均の位置のまま

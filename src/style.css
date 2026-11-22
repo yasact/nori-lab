@@ -62,6 +62,8 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 #pinfo{margin:8px 0 0;font-size:.75rem;color:var(--mute)}
 .v{font-family:var(--f-num);font-size:.9em;color:var(--mute)}
 #psave{min-height:44px}
+.adv summary{cursor:pointer;font-size:.9rem;color:var(--mute);padding:12px 0}
+.adv .row{margin-top:8px}
 .note{font-size:.82rem;color:var(--mute);max-width:65ch;margin:0}
 @media (max-width:560px){
   .row{grid-template-columns:1fr 6.5em}
