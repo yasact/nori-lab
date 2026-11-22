@@ -9,32 +9,45 @@
 <div class="wrap">
   <header>
     <h1>ノリ・<span>ラボ</span></h1>
-    <p class="sub">表拍の遅れ × 裏拍の距離で 8分音符を鳴らし続ける</p>
+    <p class="sub catch">自分の好きなノリを探そう</p>
   </header>
 
   <section class="panel scope">
-    <div class="views">
+    <div class="dialcol">
       <canvas id="dial" role="img" aria-label="円のタイミング表示（1周＝1拍。丸と針をドラッグで調整）"></canvas>
-      <canvas id="cv" aria-label="2拍分のタイミング表示"></canvas>
-    </div>
-    <div class="legend">
-      <span><i style="background:var(--grid)"></i>ビート（リズム隊のグリッド）</span>
-      <span><i style="background:var(--down)"></i>表拍の8分</span>
-      <span><i style="background:var(--up)"></i>裏拍の8分</span>
-      <span><i style="background:var(--grid);opacity:.4"></i>ストレートの裏（50%）</span>
+      <!-- 初回だけ（localStorage nori-lab-seen）。鳴らし始めたら消す -->
+      <button id="tapstart" class="tapstart" hidden>▶ タップして聴く</button>
+      <p class="dialhint"><span class="d" aria-hidden="true">●</span> 表と <span class="u" aria-hidden="true">●</span> 裏をつまんで回す</p>
+      <p id="pinfo"></p>
+      <div class="trio" role="group" aria-label="お手本（JATP Blues 1946）">
+        <button data-player="コールマン・ホーキンス" aria-pressed="false">ホーキンス</button>
+        <button data-player="レスター・ヤング" aria-pressed="false">ヤング</button>
+        <button data-player="チャーリー・パーカー" aria-pressed="false">パーカー</button>
+      </div>
     </div>
     <div class="chk ticks" role="group" aria-labelledby="ticks-h">
       <span id="ticks-h" class="chk-h">円の目盛り</span>
       <label><input type="checkbox" id="m-t8" checked>8分</label>
       <label><input type="checkbox" id="m-t3" checked>3連</label>
     </div>
-    <div class="readout">
-      <div><small>遅れ値</small><b id="r-lag">—</b></div>
-      <div><small>ハネ値</small><b id="r-hane">—</b></div>
-      <div><small>裏拍値</small><b id="r-ura">—</b></div>
-      <div><small>スウィング比</small><b id="r-ratio">—</b></div>
-      <div><small>1拍の長さ</small><b id="r-beat">—</b></div>
-    </div>
+    <!-- 2 拍表示・凡例・読み取りは細かく詰める人・練習する人向け。既定で閉じる（開いたら draw し直す） -->
+    <details class="adv twobeat" id="twobeat">
+      <summary>2拍で見る（ms・コード）</summary>
+      <canvas id="cv" aria-label="2拍分のタイミング表示"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--grid)"></i>ビート（リズム隊のグリッド）</span>
+        <span><i style="background:var(--down)"></i>表拍の8分</span>
+        <span><i style="background:var(--up)"></i>裏拍の8分</span>
+        <span><i style="background:var(--grid);opacity:.4"></i>ストレートの裏（50%）</span>
+      </div>
+      <div class="readout">
+        <div><small>遅れ値</small><b id="r-lag">—</b></div>
+        <div><small>ハネ値</small><b id="r-hane">—</b></div>
+        <div><small>裏拍値</small><b id="r-ura">—</b></div>
+        <div><small>スウィング比</small><b id="r-ratio">—</b></div>
+        <div><small>1拍の長さ</small><b id="r-beat">—</b></div>
+      </div>
+    </details>
   </section>
 
   <section class="panel">
@@ -43,7 +56,6 @@
       <select id="preset" aria-labelledby="preset-h"></select>
       <button id="pdel" hidden>削除</button>
     </div>
-    <p id="pinfo"></p>
     <div class="custom">
       <input type="text" id="pname" placeholder="名前（例：自分のノリ）" aria-label="プリセット名">
       <button id="psave">今のノリを保存</button>

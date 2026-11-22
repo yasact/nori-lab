@@ -18,12 +18,19 @@ header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-be
 h1{font-weight:900;font-size:1.9rem;letter-spacing:.02em;margin:0;text-wrap:balance}
 h1 span{color:var(--brass)}
 .sub{color:var(--mute);font-size:.9rem;margin:0}
+.catch{color:var(--ink);font-weight:700;font-size:1rem}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
 .scope{position:relative}
 canvas{display:block;width:100%;height:170px}
-.views{display:flex;gap:16px;align-items:center}
-#dial{flex:none;width:220px;height:220px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-#cv{flex:1 1 0;min-width:0}
+.scope{--dial:260px}
+.dialcol{width:var(--dial);max-width:100%;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative}
+/* 円（220px）の真ん中に重ねる */
+.tapstart{position:absolute;top:calc(var(--dial)/2);left:50%;transform:translate(-50%,-50%);background:var(--brass);border-color:var(--brass);color:#fff;font-weight:700;font-size:1rem;padding:12px 22px;white-space:nowrap;box-shadow:0 4px 14px rgb(0 0 0/.35)}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%}
+.trio button{padding:8px 2px;font-size:.78rem;border-radius:10px;white-space:nowrap;min-height:40px}
+.trio button[aria-pressed="true"]{background:var(--brass);border-color:var(--brass);color:#fff;font-weight:700}
+#dial{width:var(--dial);height:var(--dial);max-width:100%;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.twobeat #cv{margin-top:6px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.8rem;color:var(--mute);margin-top:10px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .custom{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
@@ -76,7 +83,9 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 .pbar{display:flex;gap:8px;align-items:center}
 #preset{flex:1 1 0;min-width:0;min-height:44px;font-size:1rem}
 #pdel{flex:none;min-height:44px}
-#pinfo{margin:8px 0 0;font-size:.75rem;color:var(--mute)}
+.dialhint{margin:-4px 0 0;font-size:.75rem;color:var(--mute)}
+.dialhint .d{color:var(--down)} .dialhint .u{color:var(--up)}
+#pinfo{margin:0;font-size:.75rem;color:var(--mute);text-align:center}
 .v{font-family:var(--f-num);font-size:.9em;color:var(--mute)}
 #psave,#pshare{min-height:44px}
 #pmsg{margin-top:6px;overflow-wrap:anywhere}
@@ -100,6 +109,8 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   /* スマホは再生ボタンを右下に浮かせる（最初の画面に入らず、スライダーをいじりながらも押せるように）。下端に隠れないぶん body に余白 */
   #play{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:10;min-height:56px;box-shadow:0 4px 16px rgb(0 0 0/.35)}
   body{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  /* 初回の「タップして聴く」が出ているあいだは、浮いた再生ボタンを隠す（再生ボタンが 2 つに見えないように） */
+  body:has(#tapstart:not([hidden])) #play{display:none}
   .mix{flex-direction:column;gap:14px}
   .ch{max-width:none;grid-template-columns:6.5em 1fr 5.5em;grid-template-areas:"nm r n" "ms r n";justify-items:stretch;align-items:center;gap:4px 10px;padding:0;border:0}
   .ch.master{border-top:1px solid var(--line);border-radius:0;background:none;padding-top:12px}
@@ -110,8 +121,5 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
   .row label{grid-column:1/-1}
   .readout{grid-template-columns:repeat(3,minmax(0,1fr))}
   h1{font-size:1.5rem}
-  .views{flex-direction:column;align-items:stretch}
-  #dial{align-self:center}
-  #cv{flex:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
