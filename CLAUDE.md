@@ -1,7 +1,8 @@
 # ノリ・ラボ（nori-lab）
 
 ジャズの8分音符の「ノリ」を、井上裕章『ジャズの「ノリ」を科学する』の指標で再現して鳴らす Web Audio アプリ。
-単一ファイル `index.html`（HTML/CSS/JS、ライブラリなし、Google Fonts のみ外部読み込み）。
+Vite + TypeScript（framework なし、runtime 依存ゼロ、`strict: true`、外部読み込みは Google Fonts のみ）。公開先は GitHub Pages（https://yasact.github.io/nori-lab/、`vite.config.ts` の `base: '/nori-lab/'`）。main への push で `.github/workflows/deploy.yml` が build → `dist/` を deploy する。
+`npm run dev` で開発、`npm run build`（`tsc --noEmit` → `vite build`）が通ることを確認する。
 
 ## 指標（本・論文と同じ定義）
 - **遅れ値** = ベースの拍頭に対する表拍8分の遅れ ÷ 1拍の長さ（マイナスで前ノリ）
@@ -13,6 +14,13 @@
 遅れ値で保持しているので、テンポを変えてもノリは保たれる。
 
 ## 構成
+- ファイル（import は main → draw → audio → music の一方向。`state` はどこからでも読む）
+  - `index.html`: markup だけ。`src/style.css`: CSS（テーマの CSS 変数もここ）
+  - `src/state.ts`: `$`（getElementById。既定の型は HTMLInputElement）と `P`
+  - `src/music.ts`: 進行・メロディ・ベース。DOM に触らない（`buildProg(name)` は進行名を引数で受ける）。再生開始時に `resetMusic()`
+  - `src/audio.ts`: シンセとスケジューラ。`ctx` は最初の再生で `initAudio()` するまで undefined。`startScheduler()` / `stopScheduler()` と `playing` / `beatLog` を export
+  - `src/draw.ts`: `#cv` と `#dial` の描画、再生中の `loop()`（`head` / `curChord` はここだけで持つ）
+  - `src/main.ts`: 入口。入力のひも付け・プリセット・円のドラッグ・音量・再生ボタン/Space。音量の gain は `start()` で `initAudio()` の直後に入れる
 - 音: Web Audio のシンセ（ホーン=saw+square→LPF、ベース=tri+sine、ライド=808式 square 6本→HPF→VCA＋スティック音（右）、ハイハット=ノイズ+BPF（左））
   - グラフ: 各声部 → `hornBus` / `bassBus` / `drumBus`（ライド・ハットの panner）→ `master`(0.8) → DynamicsCompressor → `out` → destination。新しい声部は必ずどれかの bus につなぐ（`master` に直結しない。`noiseHit` の `dest` は必須）
 - 音量: 再生ボタンの下の「音量」に 4 本（全体 0–100 % が `out`、ホーン/ベース/ドラム 0–150 % が各 bus）。gain = (位置/100)^2 で、表示 % はつまみ位置（gain ではない）。`setTargetAtTime(…, 0.015)` で動かしたものだけ反映。範囲・既定値は markup の range の `min`/`max`/`value` が正で JS はそこから読む。localStorage `nori-lab-volume`（{all, horn, bass, drums}、range の `change` と数値の `change` で保存。全体 0 は復元せず 100）。パートはコンプの前なので少し影響しあう（ベース 0 で他が約 +2 dB）
