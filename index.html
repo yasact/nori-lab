@@ -23,6 +23,11 @@
       <span><i style="background:var(--up)"></i>裏拍の8分</span>
       <span><i style="background:var(--grid);opacity:.4"></i>ストレートの裏（50%）</span>
     </div>
+    <div class="chk ticks" role="group" aria-labelledby="ticks-h">
+      <span id="ticks-h" class="chk-h">円の目盛り</span>
+      <label><input type="checkbox" id="m-t8" checked>8分</label>
+      <label><input type="checkbox" id="m-t3" checked>3連</label>
+    </div>
     <div class="readout">
       <div><small>遅れ値</small><b id="r-lag">—</b></div>
       <div><small>ハネ値</small><b id="r-hane">—</b></div>
@@ -57,13 +62,13 @@
       <summary>詳細設定</summary>
       <div class="row">
         <label for="yd">表のゆらぎ<em>表拍の音が 1 音ごとにずれる。0% でぴったり</em></label>
-        <input type="range" id="yd-r" min="0" max="150" step="1" value="50" aria-label="表のゆらぎ">
-        <div class="num"><input type="number" id="yd" min="0" max="150" step="1" value="50"><span>%</span></div>
+        <input type="range" id="yd-r" min="0" max="150" step="1" value="0" aria-label="表のゆらぎ">
+        <div class="num"><input type="number" id="yd" min="0" max="150" step="1" value="0"><span>%</span></div>
       </div>
       <div class="row">
         <label for="yu">裏のゆらぎ<em>裏拍の音が 1 音ごとにずれる。100% で録音の演奏くらい</em></label>
-        <input type="range" id="yu-r" min="0" max="150" step="1" value="50" aria-label="裏のゆらぎ">
-        <div class="num"><input type="number" id="yu" min="0" max="150" step="1" value="50"><span>%</span></div>
+        <input type="range" id="yu-r" min="0" max="150" step="1" value="0" aria-label="裏のゆらぎ">
+        <div class="num"><input type="number" id="yu" min="0" max="150" step="1" value="0"><span>%</span></div>
       </div>
       <div class="row">
         <label for="bl">ベースの位置<em>ライドからのズレ。マイナスでちょい早（<span id="bl-ms">0</span> ms）</em></label>
@@ -73,7 +78,7 @@
     </details>
 
     <div class="bar">
-      <button id="play" aria-pressed="false">▶ 再生</button>
+      <button id="play" aria-pressed="false" aria-keyshortcuts="Space" title="スペースキーでも再生／停止">▶ 再生</button>
       <select id="prog" aria-label="コード進行">
         <option value="blues">B♭ブルース（12小節）</option>
         <option value="rhythm">循環（リズム・チェンジ A）</option>
@@ -81,37 +86,42 @@
         <option value="one">ワンコード（B♭7）</option>
       </select>
       <div class="chk">
-        <label><input type="checkbox" id="m-ride" checked>ライド（4分）</label>
-        <label><input type="checkbox" id="m-hh" checked>ハイハット（2・4）</label>
-        <label><input type="checkbox" id="m-bass" checked>ベース（4分）</label>
         <label><input type="checkbox" id="m-acc">裏拍アクセント</label>
         <label><input type="checkbox" id="m-mono">単音にする</label>
-        <label><input type="checkbox" id="m-t8" checked>円に8分の目盛り</label>
-        <label><input type="checkbox" id="m-t3" checked>円に3連の目盛り</label>
       </div>
     </div>
 
     <div class="vol" role="group" aria-labelledby="vol-h">
-      <h2 id="vol-h">音量</h2>
-      <div class="row">
-        <label for="vol-all">全体<em>0 で無音</em></label>
-        <input type="range" id="vol-all-r" min="0" max="100" step="1" value="100" aria-label="音量（全体）">
-        <div class="num"><input type="number" id="vol-all" min="0" max="100" step="1" value="100"><span>%</span></div>
-      </div>
-      <div class="row">
-        <label for="vol-horn">ホーン</label>
-        <input type="range" id="vol-horn-r" min="0" max="150" step="1" value="100" aria-label="音量（ホーン）">
-        <div class="num"><input type="number" id="vol-horn" min="0" max="150" step="1" value="100"><span>%</span></div>
-      </div>
-      <div class="row">
-        <label for="vol-bass">ベース</label>
-        <input type="range" id="vol-bass-r" min="0" max="150" step="1" value="100" aria-label="音量（ベース）">
-        <div class="num"><input type="number" id="vol-bass" min="0" max="150" step="1" value="100"><span>%</span></div>
-      </div>
-      <div class="row">
-        <label for="vol-drums">ドラム<em>ライド＋ハイハット</em></label>
-        <input type="range" id="vol-drums-r" min="0" max="150" step="1" value="100" aria-label="音量（ドラム）">
-        <div class="num"><input type="number" id="vol-drums" min="0" max="150" step="1" value="100"><span>%</span></div>
+      <h2 id="vol-h">ミキサー</h2>
+      <div class="mix">
+        <div class="ch">
+          <label class="nm" for="vol-horn">ホーン</label>
+          <svg class="knob" aria-hidden="true" viewBox="0 0 68 68"></svg>
+          <input type="range" id="vol-horn-r" min="0" max="150" step="1" value="100" aria-label="音量（ホーン）">
+          <div class="num"><input type="number" id="vol-horn" min="0" max="150" step="1" value="100"><span>%</span></div>
+          <div class="ms"><label class="m"><input type="checkbox" id="m-horn" checked aria-label="ホーンを鳴らす">M</label></div>
+        </div>
+        <div class="ch">
+          <label class="nm" for="vol-bass">ベース</label>
+          <svg class="knob" aria-hidden="true" viewBox="0 0 68 68"></svg>
+          <input type="range" id="vol-bass-r" min="0" max="150" step="1" value="100" aria-label="音量（ベース）">
+          <div class="num"><input type="number" id="vol-bass" min="0" max="150" step="1" value="100"><span>%</span></div>
+          <div class="ms"><label class="m"><input type="checkbox" id="m-bass" checked aria-label="ベースを鳴らす">M</label></div>
+        </div>
+        <div class="ch">
+          <label class="nm" for="vol-drums">ドラム</label>
+          <svg class="knob" aria-hidden="true" viewBox="0 0 68 68"></svg>
+          <input type="range" id="vol-drums-r" min="0" max="150" step="1" value="100" aria-label="音量（ドラム）">
+          <div class="num"><input type="number" id="vol-drums" min="0" max="150" step="1" value="100"><span>%</span></div>
+          <div class="ms"><label class="m"><input type="checkbox" id="m-ride" checked aria-label="ライドを鳴らす">M ライド</label><label class="m"><input type="checkbox" id="m-hh" checked aria-label="ハイハットを鳴らす">M ハット</label></div>
+        </div>
+        <div class="ch master">
+          <label class="nm" for="vol-all">全体</label>
+          <svg class="knob" aria-hidden="true" viewBox="0 0 68 68"></svg>
+          <input type="range" id="vol-all-r" min="0" max="100" step="1" value="100" aria-label="音量（全体）">
+          <div class="num"><input type="number" id="vol-all" min="0" max="100" step="1" value="100"><span>%</span></div>
+          <div class="ms"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -127,7 +137,7 @@
       <input type="text" id="pname" placeholder="名前（例：自分のノリ）" aria-label="プリセット名">
       <button id="psave">今のノリを保存</button>
     </div>
-    <p class="note" style="margin-top:12px">プレイヤーの値は、録音を 1 音ずつ測った研究の中央値（出どころは下の「このアプリについて」）。押すと録音のテンポになる。バディ・リッチはドラム（ハイハット）の値。保存したノリはこのブラウザにだけ残る。スペースキーで再生／停止。</p>
+    <p class="note" style="margin-top:12px">プレイヤーを選ぶと、録音のテンポになる。保存したノリはこのブラウザにだけ残る。</p>
   </section>
 
   <details class="panel about">

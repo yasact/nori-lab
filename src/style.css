@@ -35,6 +35,21 @@ canvas{display:block;width:100%;height:170px}
 .controls{display:flex;flex-direction:column;gap:18px}
 .vol{display:flex;flex-direction:column;gap:18px}
 .vol h2{margin:0}
+/* ミキサー: PC 幅はノブ（値は隠した range が持つ）、560px 以下は横フェーダー */
+.mix{display:flex;gap:10px;justify-content:center}
+.ch{position:relative;flex:1 1 0;min-width:0;max-width:130px;display:grid;justify-items:center;align-content:start;gap:6px;padding:10px 6px;border:1px solid transparent;border-radius:8px}
+.ch.master{border-color:var(--brass);background:var(--bg)}
+.ch .nm{font-weight:700;font-size:.9rem}
+.knob{width:68px;height:68px;touch-action:none;cursor:ns-resize;border-radius:50%}
+.ch input[type=range]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.ch:has(input[type=range]:focus-visible) .knob{outline:2px solid var(--brass);outline-offset:2px}
+.ch .num{width:5.5em}
+.ms{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+/* M = ミュート。中身は「鳴らす」の checkbox で、外れていると点灯 */
+.m{position:relative;font-family:var(--f-num);font-size:.72rem;line-height:1.4;border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:var(--bg);white-space:nowrap}
+.m input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.m:has(input:not(:checked)){background:var(--up);border-color:var(--up);color:#fff}
+.m:has(input:focus-visible){outline:2px solid var(--brass);outline-offset:2px}
 .row{display:grid;grid-template-columns:9.5em 1fr 6.5em;align-items:center;gap:14px}
 .row label{font-weight:700;font-size:.95rem}
 .row label em{display:block;font-style:normal;font-weight:400;font-size:.72rem;color:var(--mute)}
@@ -52,6 +67,8 @@ select{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(
 .chk{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.88rem}
 .chk label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .chk input{accent-color:var(--brass)}
+.chk-h{color:var(--mute)}
+.ticks{margin-top:10px;font-size:.8rem}
 h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-weight:700}
 .tag{font-size:.75rem;line-height:1.3;padding:0 6px;border:1px solid;border-radius:4px;background:var(--panel)}
 .tag.tame{color:var(--down);border-color:var(--down)}
@@ -71,6 +88,12 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 .about p{margin:0 0 10px}
 .about a{color:var(--brass)}
 @media (max-width:560px){
+  .mix{flex-direction:column;gap:14px}
+  .ch{max-width:none;grid-template-columns:6.5em 1fr 5.5em;grid-template-areas:"nm r n" "ms r n";justify-items:stretch;align-items:center;gap:4px 10px;padding:0;border:0}
+  .ch.master{border-top:1px solid var(--line);border-radius:0;background:none;padding-top:12px}
+  .knob{display:none}
+  .ch input[type=range]{position:static;width:100%;height:auto;opacity:1;pointer-events:auto;grid-area:r}
+  .ch .nm{grid-area:nm} .ch .num{grid-area:n;width:auto} .ms{grid-area:ms;justify-content:flex-start}
   .row{grid-template-columns:1fr 6.5em}
   .row label{grid-column:1/-1}
   .readout{grid-template-columns:repeat(3,minmax(0,1fr))}

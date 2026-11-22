@@ -2,6 +2,7 @@ import { $, P, SD_AVG, YURE_DEFAULT } from './state';
 import { buildProg } from './music';
 import { ctx, out, hornBus, bassBus, drumBus, initAudio, playing, startScheduler, stopScheduler } from './audio';
 import { dial, dialGeom, draw, loop, onDial, type Geom } from './draw';
+import { initKnobs } from './knob';
 
 // ---- 入力のひも付け ----
 function sync(){
@@ -239,3 +240,4 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', draw);
 new MutationObserver(draw).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
 document.fonts?.ready.then(draw);
 sync();
+initKnobs(); // 音量の初期値（writeVol）を入れた後に描く
