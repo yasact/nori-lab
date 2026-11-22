@@ -3,7 +3,7 @@ import { buildProg } from './music';
 import { ctx, out, hornBus, bassBus, drumBus, initAudio, playing, startScheduler, stopScheduler } from './audio';
 import { dial, dialGeom, draw, loop, onDial, type Geom } from './draw';
 import { initKnobs } from './knob';
-import { clampTo, dialValue, frac, fromQuery, haneTag, tameTag, toQuery, unwrap, VOL, volFrom, type Mode, type Shared, type VolKey } from './logic';
+import { clampTo, dialValue, frac, fromQuery, haneTag, minesFrom, tameTag, toQuery, unwrap, VOL, volFrom, type Mine, type Mode, type Shared, type VolKey } from './logic';
 
 const minmax = (id: string): [number, number] => [Number($(id).min), Number($(id).max)];
 
@@ -20,15 +20,17 @@ function sync(){
   $('bl-ms').textContent = (P.bassLag > 0 ? '+' : '') + Math.round(P.bassLag * 60000 / P.bpm);
   update();
 }
-const num = (s: string) => { const v = Number(s); return isFinite(v) ? v : null; };
-const on = (ids: string[][], fn: (v: number) => void) => ids.forEach(([id, ev]) => $(id).addEventListener(ev, e => { const v = num((e.target as HTMLInputElement).value); if (v !== null) { fn(v); sync(); } }));
-on([['bpm-r','input'],['bpm','change']], v => { if (v > 0) P.bpm = v; });
-on([['delay-r','input'],['delay','change']], v => { P.lag = v / (60000 / P.bpm); });
-on([['lag-r','input'],['lag','change']], v => { P.lag = v; });
-on([['dist-r','input'],['dist','change']], v => { P.dist = v; });
-on([['yd-r','input'],['yd','change']], v => { P.yureD = clampTo(v, 0, 150); });
-on([['yu-r','input'],['yu','change']], v => { P.yureU = clampTo(v, 0, 150); });
-on([['bl-r','input'],['bl','change']], v => { P.bassLag = v; }); // プリセットとは独立（選択も外さない）
+const num = (s: string) => { const v = Number(s); return s.trim() !== '' && isFinite(v) ? v : null; };
+// 数値欄の max は手入力を止めないので、数値欄の min / max で clamp する（bpm 1e20 でスケジューラが止まらなくなる）。
+// 数でない・空のときは P を変えず、sync() で欄を今の値に戻す
+const on = (ids: string[][], fn: (v: number) => void) => ids.forEach(([id, ev]) => $(id).addEventListener(ev, e => { const v = num((e.target as HTMLInputElement).value); if (v !== null) fn(v); sync(); }));
+on([['bpm-r','input'],['bpm','change']], v => { P.bpm = clampTo(v, ...minmax('bpm')); });
+on([['delay-r','input'],['delay','change']], v => { P.lag = clampTo(v / (60000 / P.bpm), ...minmax('lag')); });
+on([['lag-r','input'],['lag','change']], v => { P.lag = clampTo(v, ...minmax('lag')); });
+on([['dist-r','input'],['dist','change']], v => { P.dist = clampTo(v, ...minmax('dist')); });
+on([['yd-r','input'],['yd','change']], v => { P.yureD = clampTo(v, ...minmax('yd')); });
+on([['yu-r','input'],['yu','change']], v => { P.yureU = clampTo(v, ...minmax('yu')); });
+on([['bl-r','input'],['bl','change']], v => { P.bassLag = clampTo(v, ...minmax('bl')); }); // プリセットとは独立（選択も外さない）
 
 // [名前, 遅れ値, ハネ値(%)]
 const PRESETS: [string, number, number][] = [
@@ -53,9 +55,8 @@ const PAPER: [string, string, number, number, number, number, number, number][] 
 ];
 // JATP Blues（1946・♩190）の奏者の PAPER の行。円の下の 3 人のボタンと起動時のパーカーで使う
 const jatp = (name: string) => PAPER.findIndex(p => p[0] === name && p[1] === 'JATP Blues');
-type Mine = { name: string; lag: number; dist: number; yureD?: number; yureU?: number }; // yureD / yureU は #8 より前の保存にはない
 const KEY = 'nori-lab-presets';
-const loadMine = (): Mine[] => { try { return JSON.parse(localStorage.getItem(KEY) as string) || []; } catch { return []; } };
+const loadMine = (): Mine[] => { try { return minesFrom(JSON.parse(localStorage.getItem(KEY) as string), SHARE_RANGE); } catch { return []; } };
 const saveMine = (a: Mine[]) => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
 const el = (tag: string, cls?: string | null, text?: string | null) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const opt = (v: string, text: string) => { const o = el('option', null, text) as HTMLOptionElement; o.value = v; return o; };
@@ -104,6 +105,11 @@ $('preset').addEventListener('change', e => {
 document.querySelectorAll<HTMLButtonElement>('.trio button').forEach(b => b.addEventListener('click', () => {
   $('preset').value = 'p' + jatp(b.dataset.player!); $('preset').dispatchEvent(new Event('change'));
 }));
+// 別のタブで保存・削除されたら一覧を作り直す（古い番号のまま読んだり消したりしないように）。保存したノリを選んでいたら選択は外す
+window.addEventListener('storage', e => {
+  if (e.key !== KEY && e.key !== null) return;
+  const v = $('preset').value; renderOptions(v.startsWith('m') ? '' : v); refresh();
+});
 $('pdel').addEventListener('click', e => {
   const a = loadMine(); a.splice(+$('preset').value.slice(1), 1); saveMine(a);
   renderOptions(''); refresh();
@@ -171,7 +177,7 @@ function stop(){
 }
 $('play').addEventListener('click', () => playing ? stop() : start());
 document.addEventListener('keydown', e => {
-  const t = e.target, skip = t instanceof HTMLSelectElement || t instanceof HTMLButtonElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type !== 'range');
+  const t = e.target, skip = t instanceof HTMLSelectElement || t instanceof HTMLButtonElement || t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.localName === 'summary') || (t instanceof HTMLInputElement && t.type !== 'range');
   if (e.code === 'Space' && !skip) {
     e.preventDefault(); playing ? stop() : start();
   }

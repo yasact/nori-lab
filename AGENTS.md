@@ -32,12 +32,14 @@ import は main → draw → audio → music の一方向。`state` と `logic` 
 
 ## 守ること
 - 純粋な計算は `src/logic.ts` に置いてテストする。範囲は DOM から読まず引数で受け、DOM から読むのは main.ts
-- 音量と共有 URL の範囲・既定値は markup（range / number の `min` / `max` / `value`）が正で、JS はそこから読む
+- 音量・共有 URL・手入力の範囲・既定値は markup（range / number の `min` / `max` / `value`）が正で、JS はそこから読む
 - 音のグラフ: 各声部 → `hornBus` / `bassBus` / `drumBus` → `master`(0.8) → DynamicsCompressor → `out` → destination。新しい声部は必ずどれかの bus につなぐ（`master` に直結しない。`noiseHit` の `dest` は必須）
 - `ctx` は最初の再生の `initAudio()` まで undefined。それより前は `if (ctx)` で確かめる。音量の gain は `start()` で `initAudio()` の直後に入れる
 - URL のクエリは信用しない: 数でない・空は無視、範囲は数値欄の min / max で clamp、名前は 40 文字まで・表示は textContent だけ、知らないキーは無視
+- localStorage も信用しない（`yasact.github.io` は同じ origin の別ページから書ける）: 保存したノリは `minesFrom` で形を確かめ、lag / dist を数値欄の範囲で clamp する
+- 数値欄の手入力も数値欄の min / max で clamp する（`max` は手入力を止めない。bpm 1e20 でスケジューラが止まらなくなる）。空・数でないときは今の値に戻す
 - 再生・停止のアイコンに文字の ▶ ■ を使わない（iOS が絵文字で描く）。CSS の `::before` + `clip-path` で描き、JS は文字（「再生」「停止」）だけ切り替える
-- Space は再生/停止。ただし text / number / checkbox の input・select・button・textarea にフォーカスがあるときはブラウザ本来の動作
+- Space は再生/停止。ただし text / number / checkbox の input・select・button・textarea・summary にフォーカスがあるときはブラウザ本来の動作
 - `near` はベース用の名前なので、円側の補助関数に使わない
 - プリセットの数値は論文・本にあるものだけ。推測値を入れない
 
@@ -89,6 +91,6 @@ import は main → draw → audio → music の一方向。`state` と `logic` 
 
 | key | 中身 |
 | --- | --- |
-| `nori-lab-presets` | 保存したノリ `[{name, lag, dist, yureD, yureU}]`。#8 より前の保存には yureD / yureU がなく、そのときと壊れた値は `YURE_DEFAULT` |
+| `nori-lab-presets` | 保存したノリ `[{name, lag, dist, yureD, yureU}]`。#8 より前の保存には yureD / yureU がなく、そのときと壊れた値は `YURE_DEFAULT`。形が違う行は読むときに捨てる。別タブで変わったら `storage` で一覧を作り直す |
 | `nori-lab-volume` | `{all, horn, bass, drums}`。range と数値の `change` で保存。全体 0 は復元せず既定値 |
 | `nori-lab-seen` | `#tapstart` を出したか |
