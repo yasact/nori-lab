@@ -1,4 +1,4 @@
-import { $, P } from './state';
+import { $, P, SD_AVG, YURE_DEFAULT } from './state';
 import { buildProg } from './music';
 import { ctx, out, hornBus, bassBus, drumBus, initAudio, playing, startScheduler, stopScheduler } from './audio';
 import { dial, dialGeom, draw, loop, onDial, type Geom } from './draw';
@@ -10,6 +10,8 @@ function sync(){
   $('delay-r').value = String(ms); $('delay').value = String(ms);
   $('lag-r').value = String(P.lag); $('lag').value = String(+P.lag.toFixed(3));
   $('dist-r').value = String(P.dist); $('dist').value = String(P.dist);
+  $('yd-r').value = String(P.yureD); $('yd').value = String(P.yureD);
+  $('yu-r').value = String(P.yureU); $('yu').value = String(P.yureU);
   update();
 }
 const num = (s: string) => { const v = Number(s); return isFinite(v) ? v : null; };
@@ -18,6 +20,8 @@ on([['bpm-r','input'],['bpm','change']], v => { if (v > 0) P.bpm = v; });
 on([['delay-r','input'],['delay','change']], v => { P.lag = v / (60000 / P.bpm); });
 on([['lag-r','input'],['lag','change']], v => { P.lag = v; });
 on([['dist-r','input'],['dist','change']], v => { P.dist = v; });
+on([['yd-r','input'],['yd','change']], v => { P.yureD = clampTo(v, 0, 150); });
+on([['yu-r','input'],['yu','change']], v => { P.yureU = clampTo(v, 0, 150); });
 
 // [名前, 遅れ値, ハネ値(%)]
 const PRESETS: [string, number, number][] = [
@@ -28,21 +32,21 @@ const PRESETS: [string, number, number][] = [
   ['後ろノリの例', 0.1, 58],
   ['前ノリの例', -0.04, 64],
 ];
-// 井上ほか（2017）表1 の中央値: [奏者, 曲, 録音年, 遅れ値, ハネ値(%), 録音テンポ]。Red Cross / Billie's Bounce は take1
-const PAPER: [string, string, number, number, number, number][] = [
-  ['チャーリー・パーカー', 'Red Cross', 1944, 0.2, 59, 200],
-  ['チャーリー・パーカー', "Billie's Bounce", 1945, 0.19, 60, 168],
-  ['チャーリー・パーカー', 'JATP Blues', 1946, 0.19, 60, 190],
-  ['マイルス・デイヴィス', "Billie's Bounce", 1945, 0.16, 59, 168],
-  ['レスター・ヤング', 'Way Down Yonder In New Orleans', 1938, 0.1, 58, 192],
-  ['レスター・ヤング', 'JATP Blues', 1946, 0.1, 60, 190],
-  ['コールマン・ホーキンス', 'Fine Dinner', 1939, 0, 64, 173],
-  ['コールマン・ホーキンス', 'JATP Blues', 1946, 0, 66, 190],
-  ['バディ・リッチ（ドラム）', 'JATP Blues', 1946, 0, 72, 190],
+// 井上ほか（2017）表1: [奏者, 曲, 録音年, 遅れ値, ハネ値(%), 録音テンポ, 遅れ値 SD, 裏拍値 SD]。値は中央値。Red Cross / Billie's Bounce は take1
+const PAPER: [string, string, number, number, number, number, number, number][] = [
+  ['チャーリー・パーカー', 'Red Cross', 1944, 0.2, 59, 200, 0.08, 0.06],
+  ['チャーリー・パーカー', "Billie's Bounce", 1945, 0.19, 60, 168, 0.07, 0.07],
+  ['チャーリー・パーカー', 'JATP Blues', 1946, 0.19, 60, 190, 0.07, 0.07],
+  ['マイルス・デイヴィス', "Billie's Bounce", 1945, 0.16, 59, 168, 0.05, 0.06],
+  ['レスター・ヤング', 'Way Down Yonder In New Orleans', 1938, 0.1, 58, 192, 0.06, 0.08],
+  ['レスター・ヤング', 'JATP Blues', 1946, 0.1, 60, 190, 0.06, 0.07],
+  ['コールマン・ホーキンス', 'Fine Dinner', 1939, 0, 64, 173, 0.06, 0.06],
+  ['コールマン・ホーキンス', 'JATP Blues', 1946, 0, 66, 190, 0.06, 0.06],
+  ['バディ・リッチ（ドラム）', 'JATP Blues', 1946, 0, 72, 190, 0.02, 0.03],
 ];
 const tameTag = (lag: number) => lag <= -0.02 ? '前ノリ' : lag < 0.04 ? 'ジャスト' : lag < 0.14 ? 'ちょい後ろ' : 'かなり後ろ';
 const haneTag = (dist: number) => dist < 54 ? 'まっすぐ' : dist < 62 ? '軽く跳ねる' : dist < 69 ? '3連くらい' : '強く跳ねる';
-type Mine = { name: string; lag: number; dist: number };
+type Mine = { name: string; lag: number; dist: number; yureD?: number; yureU?: number }; // yureD / yureU は #8 より前の保存にはない
 const KEY = 'nori-lab-presets';
 const loadMine = (): Mine[] => { try { return JSON.parse(localStorage.getItem(KEY) as string) || []; } catch { return []; } };
 const saveMine = (a: Mine[]) => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
@@ -68,8 +72,14 @@ function refresh(){
 }
 $('preset').addEventListener('change', e => {
   const v = (e.target as HTMLSelectElement).value, i = +v.slice(1), m = v[0] === 'm' && loadMine()[i];
-  const [lag, dist, bpm] = (v[0] === 'p' ? PAPER[i].slice(3) : v[0] === 'b' ? PRESETS[i].slice(1) : m ? [m.lag, m.dist] : []) as number[];
-  if (v) { P.lag = lag; P.dist = dist; if (bpm) P.bpm = bpm; sync(); }
+  const [lag, dist, bpm, sdLag = SD_AVG[0], sdUra = SD_AVG[1]] = (v[0] === 'p' ? PAPER[i].slice(3) : v[0] === 'b' ? PRESETS[i].slice(1) : m ? [m.lag, m.dist] : []) as number[];
+  if (v) {
+    P.lag = lag; P.dist = dist; if (bpm) P.bpm = bpm; P.sdLag = sdLag; P.sdUra = sdUra;
+    // ゆらぎの % は保存したノリだけが持つ。壊れた値は既定値に戻す
+    const yure = (x: unknown) => typeof x === 'number' && isFinite(x) ? clampTo(x, 0, 150) : YURE_DEFAULT;
+    if (m) { P.yureD = yure(m.yureD); P.yureU = yure(m.yureU); }
+    sync();
+  }
   refresh();
 });
 $('pdel').addEventListener('click', e => {
@@ -79,7 +89,7 @@ $('pdel').addEventListener('click', e => {
 });
 $('psave').addEventListener('click', () => {
   const name = $('pname').value.trim() || `保存 ${loadMine().length + 1}`;
-  const a = loadMine(); a.push({ name, lag:+P.lag.toFixed(4), dist:P.dist }); saveMine(a);
+  const a = loadMine(); a.push({ name, lag:+P.lag.toFixed(4), dist:P.dist, yureD:P.yureD, yureU:P.yureU }); saveMine(a);
   $('pname').value = '';
   const n = loadMine().length;
   renderOptions(n === a.length ? 'm' + (n - 1) : $('preset').value); // 保存に失敗したら（容量・プライベートモード）選択は動かさない
