@@ -1,12 +1,13 @@
 # ノリ・ラボ（nori-lab）
 
 ジャズの8分音符の「ノリ」を、井上裕章『ジャズの「ノリ」を科学する』の指標で再現して鳴らす Web Audio アプリ。
-Vite + TypeScript（framework なし、runtime 依存ゼロ、`strict: true`、外部読み込みは Google Fonts のみ）。
+Vite + TypeScript（framework なし、runtime 依存ゼロ、`strict: true`、外部読み込みは Google Fonts と Cloudflare Web Analytics の beacon のみ）。
 
 ## コマンドと公開
 - `npm run dev`: 開発
 - `npm run build`: `tsc --noEmit` → `vite build`。テストファイルも型チェックに入る。変更したら通ることを確かめる
 - `npm test`: Vitest（`src/*.test.ts`）。ローカルだけで回す（Actions では回さない）
+- アクセス数: Cloudflare Web Analytics（host `yasact.github.io`）。beacon は `index.html` の最後で、cookie なし。URL は query ごと送るので、共有されたノリの名前と値も届く。「このアプリについて」にそう書いてある
 - 公開: GitHub Pages https://yasact.github.io/nori-lab/ （`vite.config.ts` の `base: '/nori-lab/'`）。main への push で `.github/workflows/deploy.yml` が build して `dist/` を deploy する
 
 ## 指標（本・論文と同じ定義）
@@ -83,7 +84,7 @@ import は main → draw → audio → music の一方向。`state` と `logic` 
   - `initKnobs()` は main の最後（音量の初期値の後）。ノブの色は var() なのでテーマ切り替えで描き直さない
   - 「消音」ボタンの中身は checkbox `#m-horn` / `#m-bass` / `#m-ride` / `#m-hh`（checked = 鳴らす）
   - パートはコンプの前なので少し影響しあう（ベース 0 で他が約 +2 dB）
-- このアプリについて（#14）: ページ最下部の `<details class="panel about">`。数値の出典（DOI）、円で考えるやり方の出典（宇田大志さんの動画 https://youtu.be/udollUSeICM?t=61 ）、遅れ値の基準のちがい、ドラムの位置、再現していないもの、の 3 段落。出典はここにまとめ、プリセット欄の脚注は操作の 2 文だけ
+- このアプリについて（#14）: ページ最下部の `<details class="panel about">`。数値の出典（DOI）、円で考えるやり方の出典（宇田大志さんの動画 https://youtu.be/udollUSeICM?t=61 ）、遅れ値の基準のちがい、ドラムの位置、再現していないもの、アクセス解析、の 4 段落。出典はここにまとめ、プリセット欄の脚注は操作の 2 文だけ
 - フッター `.foot`: 作者名 yasact と Web・Instagram・GitHub のアイコンリンク（inline SVG）。新しいタブで開く（再生を止めない）
 
 ## localStorage

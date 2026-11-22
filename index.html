@@ -159,6 +159,7 @@
       <p>遅れ値・ハネ値・裏拍値の定義と、プレイヤーごとの値（中央値）は<a href="https://doi.org/10.32199/jsmpc.23.1_3">井上裕章ほかの論文（2017）</a>から取った。1 拍を円で考えるやり方は、宇田大志さんの<a href="https://youtu.be/udollUSeICM?t=61" target="_blank" rel="noopener">動画</a>（1:01〜）で知った。</p>
       <p>論文はベースを基準に遅れ値を測っているが、このアプリはライドが基準になっている。「ベースの位置」を 0 にすれば論文と同じになる。ドラムの位置は 1 曲しか測られておらず、ベースとほぼ同じだったので、ベースに揃えて鳴らしている。</p>
       <p>音色やフレーズ、拍ごとの細かい違いまでは再現していない。ゆらぎも、ばらつきの大きさを論文に合わせただけのランダムなので、実際の演奏のずれ方とは違う。</p>
+      <p>アクセス数を数えるために Cloudflare Web Analytics を使っている。送るのは開いたページの URL（共有されたノリの名前と値も含む）や読み込みの速さなどで、cookie は使わない。</p>
     </div>
   </details>
 
@@ -172,3 +173,5 @@
 </div>
 
 <script type="module" src="/src/main.ts"></script>
+<!-- アクセス数（Cloudflare Web Analytics）。cookie・localStorage は使わない。URL は query ごと送る（共有されたノリの名前と値を含む） -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "bea685fb435c48498c4111260c5e281c"}'></script>
