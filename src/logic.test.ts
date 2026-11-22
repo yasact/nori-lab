@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dialValue, fromQuery, haneTag, NAME_MAX, tameTag, toQuery, unwrap, VOL, volFrom, type VolKey } from './logic';
+import { dialValue, fromQuery, haneTag, minesFrom, NAME_MAX, tameTag, toQuery, unwrap, VOL, volFrom, type VolKey } from './logic';
 
 describe('dialValue', () => {
   it('表拍は 12 時をまたいでも裏拍値を保つ', () => expect(dialValue('down', { lag:0.02, dist:60 }, -0.05)).toEqual({ lag:-0.03, dist:65 }));
@@ -25,6 +25,17 @@ describe('volFrom', () => {
   it('整数に丸める', () => vol({ drums:40.7 }, { drums:41 }));
   it('全体 0 は復元しない', () => vol({ all:0, bass:0 }, { bass:0 }));
   it('オブジェクト以外は既定値', () => { vol(null, {}); vol(5, {}); });
+});
+
+describe('minesFrom', () => {
+  // index.html の数値欄と同じ min / max
+  const R = { lag:[-0.5, 0.5], dist:[30, 90] } as Parameters<typeof minesFrom>[1];
+  it('配列以外は空', () => { for (const o of [null, 'abc', { length:1 }, 5]) expect(minesFrom(o, R)).toEqual([]); });
+  it('形が違う行だけ捨てる', () => expect(minesFrom([null, 'x', { name:1, lag:0, dist:60 }, { name:'a' }, { name:'b', lag:'0.1', dist:60 },
+    { name:'c', lag:Infinity, dist:60 }, { name:'ok', lag:0.1, dist:60 }], R)).toEqual([{ name:'ok', lag:0.1, dist:60 }]));
+  it('lag / dist は範囲で clamp', () => expect(minesFrom([{ name:'a', lag:1e308, dist:-5 }], R)).toEqual([{ name:'a', lag:0.5, dist:30 }]));
+  it('ゆらぎは数のときだけ残す（#8 より前の保存はない）', () => expect(minesFrom([{ name:'a', lag:0, dist:60, yureD:30, yureU:'x' }], R))
+    .toEqual([{ name:'a', lag:0, dist:60, yureD:30 }]));
 });
 
 describe('fromQuery / toQuery', () => {

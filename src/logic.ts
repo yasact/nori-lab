@@ -34,6 +34,18 @@ export function toQuery(v: Required<Omit<Shared, 'name'>> & { name: string }){
   return q.toString();
 }
 
+// ---- 保存したノリ ----
+export type Mine = { name: string; lag: number; dist: number; yureD?: number; yureU?: number }; // yureD / yureU は #8 より前の保存にはない
+// localStorage は同じ origin（yasact.github.io）の別ページからも書けるので信用しない: 形が違う行は捨て、lag / dist は範囲で clamp。
+// ゆらぎは数のときだけ残す（範囲は適用するときに見る）
+export function minesFrom(o: unknown, range: { lag: [number, number]; dist: [number, number] }): Mine[] {
+  if (!Array.isArray(o)) return [];
+  const fin = (x: unknown): x is number => typeof x === 'number' && isFinite(x);
+  return o.filter(p => p && typeof p === 'object' && typeof p.name === 'string' && fin(p.lag) && fin(p.dist))
+    .map(p => ({ name: p.name, lag: clampTo(p.lag, ...range.lag), dist: clampTo(p.dist, ...range.dist),
+      yureD: fin(p.yureD) ? p.yureD : undefined, yureU: fin(p.yureU) ? p.yureU : undefined }));
+}
+
 // ---- 円のドラッグ: つかんだ位置からの回転量（拍）で動かす。範囲はスライダーと同じ ----
 export type Mode = 'down' | 'up' | 'needle';
 export const frac = (x: number, y: number, g: { cx: number; cy: number }) => { const f = Math.atan2(x - g.cx, -(y - g.cy)) / (2*Math.PI); return f < 0 ? f + 1 : f; };
