@@ -116,8 +116,10 @@ function tick(){
     const [md, mu] = melodyBeat(beatIdx);
     const pDown = mono ? 74 : md;
     const pUp = mono ? 74 : mu;
-    horn(tDown, pDown, (tUp - tD0)*0.92, acc ? 0.16 : 0.2);
-    horn(tUp, pUp, (tN - tUp)*0.92, acc ? 0.27 : 0.2);
+    if ($('m-horn').checked) {
+      horn(tDown, pDown, (tUp - tD0)*0.92, acc ? 0.16 : 0.2);
+      horn(tUp, pUp, (tN - tUp)*0.92, acc ? 0.27 : 0.2);
+    }
     noteIdx += 2; beatIdx++; nextBeat += T;
   }
 }

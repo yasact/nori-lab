@@ -2,7 +2,7 @@
 export const $ = <T extends HTMLElement = HTMLInputElement>(id: string) => document.getElementById(id) as T;
 
 // ゆらぎ（表・裏）の既定値（%）。保存したノリに値がないときもこれを使う
-export const YURE_DEFAULT = 50;
+export const YURE_DEFAULT = 0; // 既定はぴったり。聴き比べ（平均の位置）を邪魔しないように、ゆらぎは自分で足す
 // 実測の SD がない「基本」「保存したノリ」用: 井上ほか（2017）表1 のソリスト 8 行の平均 [遅れ値 SD, 裏拍値 SD]
 export const SD_AVG: [number, number] = [0.064, 0.066];
 
