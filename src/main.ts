@@ -12,6 +12,8 @@ function sync(){
   $('dist-r').value = String(P.dist); $('dist').value = String(P.dist);
   $('yd-r').value = String(P.yureD); $('yd').value = String(P.yureD);
   $('yu-r').value = String(P.yureU); $('yu').value = String(P.yureU);
+  $('bl-r').value = String(P.bassLag); $('bl').value = String(+P.bassLag.toFixed(3));
+  $('bl-ms').textContent = (P.bassLag > 0 ? '+' : '') + Math.round(P.bassLag * 60000 / P.bpm);
   update();
 }
 const num = (s: string) => { const v = Number(s); return isFinite(v) ? v : null; };
@@ -22,6 +24,7 @@ on([['lag-r','input'],['lag','change']], v => { P.lag = v; });
 on([['dist-r','input'],['dist','change']], v => { P.dist = v; });
 on([['yd-r','input'],['yd','change']], v => { P.yureD = clampTo(v, 0, 150); });
 on([['yu-r','input'],['yu','change']], v => { P.yureU = clampTo(v, 0, 150); });
+on([['bl-r','input'],['bl','change']], v => { P.bassLag = v; }); // プリセットとは独立（選択も外さない）
 
 // [名前, 遅れ値, ハネ値(%)]
 const PRESETS: [string, number, number][] = [
