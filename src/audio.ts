@@ -69,9 +69,33 @@ function horn(t: number, midi: number, len: number, vol: number){
   o1.start(t); o2.start(t); o1.stop(t+len+0.02); o2.stop(t+len+0.02);
 }
 
+// ---- ゆらぎ ----
+// 標準正規分布（Box-Muller）。1 - random は (0, 1] なので log は有限
+const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+const GAP = 0.05; // 裏拍と前後の表拍の最小間隔（拍）。dist の入力範囲（30〜90%）なら、ゆらぎ 0% でかかることはない
+// 1 拍分の [表, 裏, 次の表] の時刻。jD / jU / jN は表・裏・次の表のずれ（拍）。裏は表と次の表のあいだに収め、表を追い越さないことを優先する
+export function swing(bt: number, T: number, d: number, s: number, jD: number, jU: number, jN: number): [number, number, number] {
+  const tD = bt + d + jD*T, tN = bt + T + d + jN*T;
+  return [tD, Math.max(Math.min(bt + d + s*T + jU*T, tN - GAP*T), tD + GAP*T), tN];
+}
+{
+  const sd = (a: number[]) => { const m = a.reduce((x, y) => x + y) / a.length; return Math.sqrt(a.reduce((x, y) => x + (y - m)**2, 0) / a.length); };
+  const N = 4000, ds: number[] = [], us: number[] = [];
+  let ok = true;
+  for (let i = 0; i < N; i++) {
+    const [tD, tU] = swing(0, 1, 0.1, 0.6, gauss()*0.07, gauss()*0.07, gauss()*0.07); ds.push(tD); us.push(tU);
+    const [a, b] = swing(0, 1, 0.1, 0.9, gauss()*0.15, gauss()*0.15, gauss()*0.15); ok &&= b >= a + GAP; // 150% の大きな SD でも裏は表を追い越さない
+  }
+  console.assert(Math.abs(sd(ds) - 0.07) < 0.007 && Math.abs(sd(us) - 0.07) < 0.007, 'yure: SD は指定どおり', sd(ds), sd(us));
+  console.assert(ok, 'yure: 裏が表を追い越さない');
+  const [tD, tU, tN] = swing(2, 0.5, 0.03, 0.6, 0, 0, 0);
+  console.assert(tD === 2 + 0.03 && tU === 2 + 0.03 + 0.6*0.5 && tN === 2 + 0.5 + 0.03, 'yure: 0% はグリッドどおり');
+}
+
 // ---- スケジューラ ----
 export let playing = false;
 let timer: ReturnType<typeof setInterval> | undefined, nextBeat = 0, beatIdx = 0, noteIdx = 0;
+let zNext = 0; // 次の拍の表のずれ（標準正規）。裏が次の表を越えないよう 1 拍先に引いておく
 export const beatLog: [number, number, string][] = []; // [time, idx, chord]
 const LOOK = 0.15;
 function tick(){
@@ -85,13 +109,15 @@ function tick(){
     const bn = bassBeat(beatIdx);
     if ($('m-bass').checked) bass(bt, bn, T*0.92);
     const mono = $('m-mono').checked, acc = $('m-acc').checked;
-    const tDown = Math.max(bt + d, now + 0.005);
-    const tUp = bt + d + s*T;
+    // ゆらぎはホーンだけ。リズム隊はグリッドのまま
+    const sdD = P.sdLag * P.yureD/100, sdU = P.sdUra * P.yureU/100, zN = gauss();
+    const [tD0, tUp, tN] = swing(bt, T, d, s, zNext*sdD, gauss()*sdU, zN*sdD); zNext = zN;
+    const tDown = Math.max(tD0, now + 0.005);
     const [md, mu] = melodyBeat(beatIdx);
     const pDown = mono ? 74 : md;
     const pUp = mono ? 74 : mu;
-    horn(tDown, pDown, s*T*0.92, acc ? 0.16 : 0.2);
-    horn(tUp, pUp, (1-s)*T*0.92, acc ? 0.27 : 0.2);
+    horn(tDown, pDown, (tUp - tD0)*0.92, acc ? 0.16 : 0.2);
+    horn(tUp, pUp, (tN - tUp)*0.92, acc ? 0.27 : 0.2);
     noteIdx += 2; beatIdx++; nextBeat += T;
   }
 }
@@ -99,7 +125,7 @@ function tick(){
 export function startScheduler(){
   if (ctx.state === 'suspended') ctx.resume();
   nextBeat = ctx.currentTime + 0.12 + Math.max(0, -P.delay/1000);
-  beatIdx = 0; noteIdx = 0; beatLog.length = 0; resetMusic();
+  beatIdx = 0; noteIdx = 0; beatLog.length = 0; resetMusic(); zNext = gauss();
   timer = setInterval(tick, 25); tick();
   playing = true;
 }
