@@ -92,10 +92,3 @@ import は main → draw → audio → music の一方向。`state` と `logic` 
 | `nori-lab-presets` | 保存したノリ `[{name, lag, dist, yureD, yureU}]`。#8 より前の保存には yureD / yureU がなく、そのときと壊れた値は `YURE_DEFAULT` |
 | `nori-lab-volume` | `{all, horn, bass, drums}`。range と数値の `change` で保存。全体 0 は復元せず既定値 |
 | `nori-lab-seen` | `#tapstart` を出したか |
-
-## TODO 候補
-- 本にしかない型（ナヴァロ型 / クール = デイヴィス型など）のプリセット。論文の表 1 は `PAPER`（`[奏者, 曲, 録音年, 遅れ値, ハネ値(%), 録音テンポ, 遅れ値 SD, 裏拍値 SD]`、奏者名はカタカナ）に入れてある
-- 裏拍の遅れを独立パラメータにするか（今は表拍の音からの距離で決まる）
-- ゴーストノート、休符 / フレーズの息継ぎ
-- A/B 比較モード（2 つのプリセットを交互に鳴らす）
-- 音色改善（サンプル音源 or より管っぽいシンセ）、MIDI 書き出し
