@@ -186,7 +186,7 @@ function update(){
 buildProg($('prog').value); $('prog').addEventListener('change', () => buildProg($('prog').value));
 
 // ---- 再生 ----
-// 「▶ タップして聴く」は初回だけ。どの方法で鳴らしても、鳴らした時点で消して覚える
+// 「タップして聴く」は初回だけ。どの方法で鳴らしても、鳴らした時点で消して覚える
 const SEEN = 'nori-lab-seen';
 $('tapstart').hidden = (() => { try { return localStorage.getItem(SEEN) === '1'; } catch { return false; } })();
 $('tapstart').addEventListener('click', () => start());
@@ -194,12 +194,12 @@ function start(){
   $('tapstart').hidden = true; try { localStorage.setItem(SEEN, '1'); } catch {}
   if (!ctx) { initAudio(); VOL.forEach(k => { volParam(k).value = gainOf(k); }); }
   startScheduler();
-  $('play').setAttribute('aria-pressed','true'); $('play').textContent = '■ 停止';
+  $('play').setAttribute('aria-pressed','true'); $('play').textContent = '停止'; // 三角・四角は CSS（::before）
   requestAnimationFrame(loop);
 }
 function stop(){
   stopScheduler();
-  $('play').setAttribute('aria-pressed','false'); $('play').textContent = '▶ 再生';
+  $('play').setAttribute('aria-pressed','false'); $('play').textContent = '再生';
   draw();
 }
 $('play').addEventListener('click', () => playing ? stop() : start());
