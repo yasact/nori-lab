@@ -3,6 +3,9 @@ import { buildProg } from './music';
 import { ctx, out, hornBus, bassBus, drumBus, initAudio, playing, startScheduler, stopScheduler } from './audio';
 import { dial, dialGeom, draw, loop, onDial, type Geom } from './draw';
 import { initKnobs } from './knob';
+import { clampTo, dialValue, frac, fromQuery, haneTag, tameTag, toQuery, unwrap, VOL, volFrom, type Mode, type Shared, type VolKey } from './logic';
+
+const minmax = (id: string): [number, number] => [Number($(id).min), Number($(id).max)];
 
 // ---- 入力のひも付け ----
 function sync(){
@@ -50,8 +53,6 @@ const PAPER: [string, string, number, number, number, number, number, number][] 
 ];
 // JATP Blues（1946・♩190）の奏者の PAPER の行。円の下の 3 人のボタンと起動時のパーカーで使う
 const jatp = (name: string) => PAPER.findIndex(p => p[0] === name && p[1] === 'JATP Blues');
-const tameTag = (lag: number) => lag <= -0.02 ? '前ノリ' : lag < 0.04 ? 'ジャスト' : lag < 0.14 ? 'ちょい後ろ' : 'かなり後ろ';
-const haneTag = (dist: number) => dist < 54 ? 'まっすぐ' : dist < 62 ? '軽く跳ねる' : dist < 69 ? '3連くらい' : '強く跳ねる';
 type Mine = { name: string; lag: number; dist: number; yureD?: number; yureU?: number }; // yureD / yureU は #8 より前の保存にはない
 const KEY = 'nori-lab-presets';
 const loadMine = (): Mine[] => { try { return JSON.parse(localStorage.getItem(KEY) as string) || []; } catch { return []; } };
@@ -59,44 +60,10 @@ const saveMine = (a: Mine[]) => { try { localStorage.setItem(KEY, JSON.stringify
 const el = (tag: string, cls?: string | null, text?: string | null) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const opt = (v: string, text: string) => { const o = el('option', null, text) as HTMLOptionElement; o.value = v; return o; };
 const grp = (label: string, opts: HTMLOptionElement[]) => { const g = el('optgroup') as HTMLOptGroupElement; g.label = label; g.append(...opts); return g; };
-// ---- URL で共有（#21）: ?n=名前&bpm=&lag=&hane=&yd=&yu=&bl= ----
-type Shared = { name?: string; bpm?: number; lag?: number; dist?: number; yureD?: number; yureU?: number; bassLag?: number };
-// [クエリのキー, 範囲を借りる数値欄の id, Shared のキー]。範囲は入力欄の min / max と同じ
-const SHARE_KEYS: [string, string, Exclude<keyof Shared, 'name'>][] = [['bpm','bpm','bpm'], ['lag','lag','lag'], ['hane','dist','dist'], ['yd','yd','yureD'], ['yu','yu','yureU'], ['bl','bl','bassLag']];
-const NAME_MAX = 40;
-// URL は誰でも書き換えられるので信用しない: 数でないもの・空は無視、範囲外は clamp、名前は長さを切る（表示は textContent だけ）
-function fromQuery(q: URLSearchParams): Shared | null {
-  const v: Shared = {};
-  for (const [k, id, f] of SHARE_KEYS) {
-    const s = q.get(k), x = Number(s);
-    if (s === null || s.trim() === '' || !isFinite(x)) continue;
-    v[f] = Math.min(Number($(id).max), Math.max(Number($(id).min), x));
-  }
-  const n = q.get('n')?.trim().slice(0, NAME_MAX);
-  if (n) v.name = n;
-  return Object.keys(v).length ? v : null;
-}
-// 0 のゆらぎ・ベース位置は付けない（URL を短く）
-function toQuery(v: Required<Omit<Shared, 'name'>> & { name: string }){
-  const q = new URLSearchParams();
-  if (v.name) q.set('n', v.name.slice(0, NAME_MAX));
-  q.set('bpm', String(v.bpm)); q.set('lag', String(+v.lag.toFixed(4))); q.set('hane', String(v.dist));
-  if (v.yureD) q.set('yd', String(v.yureD));
-  if (v.yureU) q.set('yu', String(v.yureU));
-  if (v.bassLag) q.set('bl', String(+v.bassLag.toFixed(4)));
-  return q.toString();
-}
-{
-  const same = (a: object | null, b: object) => !!a && JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
-  console.assert(fromQuery(new URLSearchParams('')) === null && fromQuery(new URLSearchParams('zz=1&n=%20')) === null, 'share: 値がなければ null');
-  console.assert(same(fromQuery(new URLSearchParams('bpm=999&lag=abc&hane=&yd=-5&n=<b>x</b>')), { bpm:400, yureD:0, name:'<b>x</b>' }), 'share: clamp と無視');
-  console.assert(fromQuery(new URLSearchParams('n=' + 'あ'.repeat(99)))!.name!.length === NAME_MAX, 'share: 名前の長さ');
-  const v = { name:'自分のノリ & co', bpm:190, lag:0.1234, dist:62.5, yureD:30, yureU:0, bassLag:-0.05 };
-  const { yureU, ...back } = v; // 0 は URL に載らない
-  console.assert(same(fromQuery(new URLSearchParams(toQuery(v))), back), 'share: 往復');
-}
+// ---- URL で共有（#21）。範囲は数値欄の min / max ----
+const SHARE_RANGE = { bpm:minmax('bpm'), lag:minmax('lag'), dist:minmax('dist'), yureD:minmax('yd'), yureU:minmax('yu'), bassLag:minmax('bl') };
 // URL で開いたノリ。あればプリセット欄に「共有されたノリ」として出す
-const shared = fromQuery(new URLSearchParams(location.search));
+const shared = fromQuery(new URLSearchParams(location.search), SHARE_RANGE);
 // SD は平均（URL には入れない）。ゆらぎ・ベース位置は 0 のとき URL に載らないので、書かれていなければ既定値。ほかは今のまま
 function applyShared(s: Shared){ const { name, ...vals } = s; Object.assign(P, { yureD:YURE_DEFAULT, yureU:YURE_DEFAULT, bassLag:0 }, vals, { sdLag:SD_AVG[0], sdUra:SD_AVG[1] }); sync(); }
 
@@ -210,35 +177,11 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ---- 円のドラッグ: つかんだ位置からの回転量（拍）で動かす。範囲はスライダーと同じ ----
-type Mode = 'down' | 'up' | 'needle';
-const frac = (x: number, y: number, g: Geom) => { const f = Math.atan2(x - g.cx, -(y - g.cy)) / (2*Math.PI); return f < 0 ? f + 1 : f; };
-const unwrap = (a: number, ref: number) => a + Math.round(ref - a);
-const snap = (x: number, step: number) => +(Math.round(x / step) * step).toFixed(3);
-const clampTo = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+// ---- 円のドラッグ（値の計算は logic.ts の dialValue） ----
 const segDist = (x: number, y: number, ax: number, ay: number, bx: number, by: number) => {
   const dx = bx - ax, dy = by - ay, t = clampTo(((x - ax)*dx + (y - ay)*dy) / (dx*dx + dy*dy), 0, 1);
   return Math.hypot(x - ax - t*dx, y - ay - t*dy);
 };
-// s は範囲内に収めた開始値、acc は累積回転量（拍）。表拍は裏拍値を保ち、裏拍はハネ値だけ、針は遅れ値だけ
-function dialValue(mode: Mode, s: { lag: number; dist: number }, acc: number){
-  if (mode === 'up') return { lag: s.lag, dist: clampTo(snap(s.dist + acc*100, 0.5), 40, 80) };
-  if (mode === 'needle') return { lag: clampTo(snap(s.lag + acc, 0.005), -0.15, 0.3), dist: s.dist };
-  const ura = s.lag + s.dist/100;
-  // 範囲で止めてから丸める（端の ura-0.8 などに浮動小数の端数が残らないように）
-  const lag = snap(clampTo(s.lag + acc, Math.max(-0.15, ura - 0.8), Math.min(0.3, ura - 0.4)), 0.005);
-  return { lag, dist: clampTo(snap((ura - lag)*100, 0.5), 40, 80) };
-}
-{
-  const eq = (v: { lag: number; dist: number }, lag: number, dist: number) => v.lag === lag && v.dist === dist;
-  console.assert(eq(dialValue('down', {lag:0.02, dist:60}, -0.05), -0.03, 65), 'dial: down across 12 o\'clock');
-  console.assert(eq(dialValue('up', {lag:0.075, dist:60}, 0.9), 0.075, 80), 'dial: up overshoot pins at 80');
-  console.assert(eq(dialValue('down', {lag:0.075, dist:60}, -0.3), -0.125, 80), 'dial: down hits dist limit');
-  console.assert(eq(dialValue('down', {lag:0.075, dist:60}, 1.2), 0.275, 40), 'dial: down hits dist 40');
-  console.assert(eq(dialValue('needle', {lag:0.075, dist:60}, 0.1), 0.175, 60), 'dial: needle keeps dist');
-  console.assert(eq(dialValue('needle', {lag:0.075, dist:60}, -0.7), -0.15, 60), 'dial: needle pins at -0.15');
-  console.assert(Math.abs(unwrap(0.02, 0.98) - 1.02) < 1e-9 && Math.abs(unwrap(0.97, 0.01) + 0.03) < 1e-9, 'dial: unwrap');
-}
 let drag: { id: number; mode: Mode; s: { lag: number; dist: number }; a0: number; prev: number } | null = null;
 const ptr = (e: PointerEvent) => { const r = dial.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
 dial.addEventListener('pointerdown', e => {
@@ -268,30 +211,11 @@ dial.addEventListener('pointermove', e => {
 $('twobeat').addEventListener('toggle', draw); // 閉じている間は幅 0 なので、開いたら描き直す
 
 // ---- 音量: 範囲と既定値は markup の range が正。表示 % はつまみ位置で、gain = (位置/100)^2 ----
-const VOL = ['all', 'horn', 'bass', 'drums'] as const;
-type VolKey = typeof VOL[number];
 const rng = (k: VolKey) => $('vol-' + k + '-r');
-const lim = (k: VolKey): [number, number] => [Number(rng(k).min), Number(rng(k).max)];
+const lim = (k: VolKey) => minmax('vol-' + k + '-r');
 const VKEY = 'nori-lab-volume';
-const volDefault = (k: VolKey) => Number(rng(k).defaultValue);
-// 保存値の検証。Number(null) や Number('') は 0（無音）になるので typeof で弾く。全体 0 だけは復元しない（無音で始まると壊れて見える）
-const volFrom = (o: unknown) => Object.fromEntries(VOL.map(k => {
-  const v = o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined;
-  if (typeof v !== 'number' || !isFinite(v)) return [k, volDefault(k)];
-  const r = clampTo(Math.round(v), ...lim(k));
-  return [k, k === 'all' && r === 0 ? volDefault(k) : r];
-})) as Record<VolKey, number>;
-{
-  const eq = (o: unknown, want: Partial<Record<VolKey, number>>) => { const v = volFrom(o); return VOL.every(k => v[k] === (want[k] ?? 100)); };
-  console.assert(eq({all:'x'}, {}), 'vol: string');
-  console.assert(eq({all:null}, {}), 'vol: null');
-  console.assert(eq({all:999, bass:999}, {bass:150}), 'vol: clamp max');
-  console.assert(eq({horn:-5}, {horn:0}), 'vol: clamp min');
-  console.assert(eq({drums:40.7}, {drums:41}), 'vol: round');
-  console.assert(eq({all:0, bass:0}, {bass:0}), 'vol: all 0 not restored');
-  console.assert(eq(null, {}) && eq(5, {}), 'vol: non-object');
-}
-const loadVol = () => { try { return volFrom(JSON.parse(localStorage.getItem(VKEY) as string)); } catch { return volFrom(null); } };
+const VSPEC = Object.fromEntries(VOL.map(k => [k, [...lim(k), Number(rng(k).defaultValue)]])) as Record<VolKey, [number, number, number]>;
+const loadVol = () => { try { return volFrom(JSON.parse(localStorage.getItem(VKEY) as string), VSPEC); } catch { return volFrom(null, VSPEC); } };
 const saveVol = () => { try { localStorage.setItem(VKEY, JSON.stringify(V)); } catch {} };
 const V = loadVol();
 const writeVol = (k: VolKey) => { rng(k).value = String(V[k]); $('vol-' + k).value = String(V[k]); };
