@@ -65,6 +65,11 @@ h2{font-size:.8rem;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-w
 .adv summary{cursor:pointer;font-size:.9rem;color:var(--mute);padding:12px 0}
 .adv .row{margin-top:8px}
 .note{font-size:.82rem;color:var(--mute);max-width:65ch;margin:0}
+.about{padding-block:6px}
+.about summary{cursor:pointer;font-size:.9rem;font-weight:700;color:var(--mute);padding:10px 0}
+.about .note{max-width:none}
+.about p{margin:0 0 10px}
+.about a{color:var(--brass)}
 @media (max-width:560px){
   .row{grid-template-columns:1fr 6.5em}
   .row label{grid-column:1/-1}
